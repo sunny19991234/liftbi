@@ -1,0 +1,295 @@
+"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Cycling",,"",0,"normal",,,,600,
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Standing Calve Raises (Free Weight)",,"",0,"normal",20,12,,,7
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Standing Calve Raises (Free Weight)",,"",1,"normal",30,10,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Standing Calve Raises (Free Weight)",,"",2,"normal",40,9,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Romanian Deadlift (Dumbbell)",,"",0,"normal",40,12,,,8
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Romanian Deadlift (Dumbbell)",,"",1,"normal",40,12,,,
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Hack Squat (Machine)",,"",0,"warmup",10,12,,,7
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Hack Squat (Machine)",,"",1,"normal",20,9,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Hack Squat (Machine)",,"",2,"normal",30,5,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Hack Squat (Machine)",,"",3,"normal",30,4,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Leg Curl (Machine)",,"",0,"normal",32,12,,,7.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Leg Curl (Machine)",,"",1,"normal",39,11,,,8
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Leg Curl (Machine)",,"",2,"normal",41.5,6,,,8
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Leg Extension (Machine)",,"",0,"normal",32,12,,,8
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Leg Extension (Machine)",,"",1,"normal",34.5,10,,,8
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Leg Extension (Machine)",,"",2,"normal",39,8,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Palms Up Wrist Curl",,"",0,"normal",12,12,,,7
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Palms Up Wrist Curl",,"",1,"normal",16,12,,,7
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Palm Down Wrist Extension",,"",0,"normal",8,12,,,8.5
+"LEGS","Jun 19, 2026, 9:40 AM","Jun 19, 2026, 10:45 AM","","Seated Palm Down Wrist Extension",,"",1,"normal",12,8,,,9
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Cycling",,"",0,"normal",,,,600,
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Lat Pulldown (Cable)",,"",0,"warmup",18,12,,,6
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Lat Pulldown (Cable)",,"",1,"normal",39,10,,,7
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Lat Pulldown (Cable)",,"",2,"normal",45,8,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Lat Pulldown (Cable)",,"",3,"normal",47.3,6,,,9
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Reverse Fly Single Arm (Cable)",,"",0,"normal",2.3,12,,,8
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Reverse Fly Single Arm (Cable)",,"",1,"normal",2.3,10,,,7.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Reverse Fly Single Arm (Cable)",,"",2,"normal",3.55,8,,,9
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Iso-Lateral Row (Machine)",,"",0,"normal",20,10,,,7.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Iso-Lateral Row (Machine)",,"",1,"normal",25,8,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Iso-Lateral Row (Machine)",,"",2,"normal",30,6,,,9
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Seated Cable Row - V Grip (Cable)",,"",0,"normal",34.5,10,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Seated Cable Row - V Grip (Cable)",,"",1,"normal",39,8,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Seated Incline Curl (Dumbbell)",,"",0,"normal",14,10,,,8
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Seated Incline Curl (Dumbbell)",,"",1,"normal",16,8,,,9
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Seated Incline Curl (Dumbbell)",,"",2,"normal",16,6,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Hammer Curl (Cable)",,"",0,"normal",11.3,9,,,8.5
+"PULL PULL PULL","Jun 18, 2026, 10:59 AM","Jun 18, 2026, 12:06 PM","","Hammer Curl (Cable)",,"",1,"normal",13.5,6,,,8.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Incline Bench Press (Dumbbell)",,"",0,"warmup",16,12,,,6
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Incline Bench Press (Dumbbell)",,"",1,"normal",24,12,,,8
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Incline Bench Press (Dumbbell)",,"",2,"normal",24,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Incline Bench Press (Dumbbell)",,"",3,"normal",28,5,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Chest Press (Machine)",,"",0,"normal",27.5,10,,,8
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Chest Press (Machine)",,"",1,"normal",32,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Chest Fly (Machine)",,"",0,"normal",52,10,,,8.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Chest Fly (Machine)",,"",1,"normal",55.5,8,,,8
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Chest Fly (Machine)",,"",2,"normal",59,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Seated Shoulder Press (Machine)",,"",0,"normal",20,10,,,8.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Seated Shoulder Press (Machine)",,"",1,"normal",23,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Seated Shoulder Press (Machine)",,"",2,"normal",24,6,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Lateral Raise (Dumbbell)",,"",0,"normal",6,15,,,8.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Lateral Raise (Dumbbell)",,"",1,"normal",6,12,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Lateral Raise (Dumbbell)",,"",2,"normal",8,10,,,8.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Single Arm Triceps Pushdown (Cable)",,"",0,"normal",4.5,12,,,7.5
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Single Arm Triceps Pushdown (Cable)",,"",1,"normal",5.75,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Triceps Extension (Cable)",,"",0,"normal",2.5,8,,,9
+"PUSH PUSH PUSH","Jun 16, 2026, 2:21 PM","Jun 16, 2026, 3:17 PM","","Triceps Extension (Cable)",,"",1,"normal",2.5,8,,,8.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Shoulder Press (Dumbbell)",,"",0,"warmup",8,12,,,6
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Shoulder Press (Dumbbell)",,"",1,"normal",20,10,,,7
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Shoulder Press (Dumbbell)",,"",2,"normal",24,10,,,9
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Shoulder Press (Dumbbell)",,"",3,"normal",28,6,,,9.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Lat Pulldown (Machine)",,"",0,"normal",32,10,,,6
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Lat Pulldown (Machine)",,"",1,"normal",36,8,,,7.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Lat Pulldown (Machine)",,"",2,"normal",41,6,,,9
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Rear Delt Reverse Fly (Machine)",,"",0,"normal",25,12,,,7.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Rear Delt Reverse Fly (Machine)",,"",1,"normal",32,10,,,8
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Incline Bench Press (Smith Machine)",,"",0,"normal",11.5,12,,,7
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Incline Bench Press (Smith Machine)",,"",1,"normal",21.5,10,,,8.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Incline Bench Press (Smith Machine)",,"",2,"normal",26.5,8,,,8
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Seated Row (Machine)",,"",0,"normal",23,10,,,7
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Seated Row (Machine)",,"",1,"normal",27,10,,,9
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Triceps Rope Pushdown",,"",0,"normal",11.3,10,,,7
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Triceps Rope Pushdown",,"",1,"normal",13.5,7,,,9.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Bicep Curl (Cable)",,"",0,"normal",11.3,10,,,8.5
+"UPPER","Jun 14, 2026, 10:24 AM","Jun 14, 2026, 11:19 AM","","Bicep Curl (Cable)",,"",1,"normal",13.5,8,,,10
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Lat Pulldown (Cable)",,"",0,"warmup",18,12,,,6
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Lat Pulldown (Cable)",,"",1,"normal",32,10,,,6
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Lat Pulldown (Cable)",,"",2,"normal",39,10,,,7.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Lat Pulldown (Cable)",,"",3,"normal",45,8,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Seated Cable Row - V Grip (Cable)",,"",0,"normal",34.5,10,,,8
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Seated Cable Row - V Grip (Cable)",,"",1,"normal",39,8,,,9
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Reverse Fly Single Arm (Cable)",,"",0,"normal",2.3,12,,,8.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Reverse Fly Single Arm (Cable)",,"",1,"normal",2.3,10,,,9
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Iso-Lateral Row (Machine)",,"",0,"normal",15,10,,,8
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Iso-Lateral Row (Machine)",,"",1,"normal",20,10,,,8.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Iso-Lateral Row (Machine)",,"",2,"normal",25,8,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Seated Incline Curl (Dumbbell)",,"Dumbell stand 3",0,"normal",14,10,,,8
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Seated Incline Curl (Dumbbell)",,"Dumbell stand 3",1,"normal",16,7,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Seated Incline Curl (Dumbbell)",,"Dumbell stand 3",2,"normal",16,6,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Hammer Curl (Cable)",,"",0,"normal",9,9,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Hammer Curl (Cable)",,"",1,"normal",11.5,8,,,9.5
+"PULL PULL PULL","Jun 12, 2026, 10:55 AM","Jun 12, 2026, 11:56 AM","","Single Arm Curl (Cable)",,"",0,"normal",4.5,10,,,8.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Cycling",,"",0,"normal",,,,600,
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Incline Bench Press (Dumbbell)",,"",0,"warmup",16,12,,,6
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Incline Bench Press (Dumbbell)",,"",1,"normal",24,12,,,8
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Incline Bench Press (Dumbbell)",,"",2,"normal",24,10,,,8.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Incline Bench Press (Dumbbell)",,"",3,"normal",28,6,,,9.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Chest Fly (Machine)",,"",0,"normal",45,12,,,7
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Chest Fly (Machine)",,"",1,"normal",52,10,,,8.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Chest Fly (Machine)",,"",2,"normal",59,7,,,9
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Chest Press (Machine)",,"",0,"normal",32,7,,,8
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Chest Press (Machine)",,"",1,"normal",34.3,5,,,10
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Seated Shoulder Press (Machine)",,"",0,"normal",18,10,,,7.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Seated Shoulder Press (Machine)",,"",1,"normal",23,8,,,9
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Seated Shoulder Press (Machine)",,"",2,"normal",23,6,,,9
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Lateral Raise (Dumbbell)",,"",0,"normal",6,15,,,9
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Lateral Raise (Dumbbell)",,"",1,"normal",8,11,,,9.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Single Arm Triceps Pushdown (Cable)",,"",0,"normal",4.5,12,,,7.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Single Arm Triceps Pushdown (Cable)",,"",1,"normal",5.75,8,,,9.5
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Triceps Extension (Cable)",,"",0,"normal",2.3,7,,,9
+"PUSH PUSH PUSH","Jun 9, 2026, 11:01 AM","Jun 9, 2026, 12:02 PM","","Triceps Extension (Cable)",,"",1,"normal",2.3,7,,,9.5
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Cycling",,"",0,"normal",,,,600,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Shoulder Press (Dumbbell)",,"",0,"warmup",8,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Shoulder Press (Dumbbell)",,"",1,"normal",16,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Shoulder Press (Dumbbell)",,"",2,"normal",20,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Shoulder Press (Dumbbell)",,"",3,"normal",24,9,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral High Row (Machine)",,"",0,"warmup",10,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral High Row (Machine)",,"",1,"normal",20,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral High Row (Machine)",,"",2,"normal",40,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral High Row (Machine)",,"",3,"normal",60,8,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Rear Delt Reverse Fly (Machine)",,"",0,"normal",23,11,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Rear Delt Reverse Fly (Machine)",,"",1,"normal",27,9,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Incline Bench Press (Smith Machine)",,"",0,"normal",11.5,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Incline Bench Press (Smith Machine)",,"",1,"normal",31.5,6,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Incline Bench Press (Smith Machine)",,"",2,"normal",36.5,5,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral Row (Machine)",,"",0,"normal",10,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Iso-Lateral Row (Machine)",,"",1,"normal",20,10,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Triceps Rope Pushdown",,"",0,"normal",11.5,12,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Triceps Rope Pushdown",,"",1,"normal",13.5,7,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Preacher Curl (Dumbbell)",,"",0,"normal",12,11,,,
+"UPPER","Jun 7, 2026, 10:50 AM","Jun 7, 2026, 12:02 PM","","Preacher Curl (Dumbbell)",,"",1,"normal",20,8,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Cycling",,"",0,"normal",,,,600,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Hack Squat (Machine)",,"",0,"normal",10,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Hack Squat (Machine)",,"",1,"normal",20,10,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Hack Squat (Machine)",,"",2,"normal",30,6,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Seated Leg Curl (Machine)",,"",0,"normal",25,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Seated Leg Curl (Machine)",,"",1,"normal",30,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Seated Leg Curl (Machine)",,"",2,"normal",30,11,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Seated Leg Curl (Machine)",,"",3,"normal",35,8,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Leg Extension (Machine)",,"",0,"normal",25,10,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Leg Extension (Machine)",,"",1,"normal",30.5,8,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Leg Extension (Machine)",,"",2,"normal",32.5,8,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Standing Calf Raise (Machine)",,"",0,"normal",25,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Standing Calf Raise (Machine)",,"",1,"normal",45,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Standing Calf Raise (Machine)",,"",2,"normal",65,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Leg Press Horizontal (Machine)",,"",0,"normal",60,12,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Leg Press Horizontal (Machine)",,"",1,"normal",80,10,,,
+"LEGS","Jun 5, 2026, 3:44 PM","Jun 5, 2026, 4:42 PM","","Elliptical Trainer",,"",0,"normal",,,,300,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Cycling",,"",0,"normal",,,,600,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Lat Pulldown (Cable)",,"",0,"warmup",18,12,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Lat Pulldown (Cable)",,"",1,"normal",32,10,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Lat Pulldown (Cable)",,"",2,"normal",39,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Lat Pulldown (Cable)",,"",3,"normal",45,6,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Seated Cable Row - V Grip (Cable)",,"",0,"normal",39,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Seated Cable Row - V Grip (Cable)",,"",1,"normal",41.5,6,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Reverse Fly Single Arm (Cable)",,"",0,"normal",2.3,10,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Reverse Fly Single Arm (Cable)",,"",1,"normal",2.3,10,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Reverse Fly Single Arm (Cable)",,"",2,"normal",2.3,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Iso-Lateral Row (Machine)",,"",0,"normal",10,10,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Iso-Lateral Row (Machine)",,"",1,"normal",15,9,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Iso-Lateral Row (Machine)",,"",2,"normal",20,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Seated Incline Curl (Dumbbell)",,"",0,"normal",16,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Seated Incline Curl (Dumbbell)",,"",1,"normal",18,4,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Hammer Curl (Cable)",,"",0,"normal",11.5,8,,,
+"PULL PULL PULL","Jun 4, 2026, 10:04 AM","Jun 4, 2026, 11:04 AM","","Hammer Curl (Cable)",,"",1,"normal",13.5,7,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Cycling",,"",0,"normal",,,,600,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Incline Bench Press (Dumbbell)",,"",0,"warmup",16,12,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Incline Bench Press (Dumbbell)",,"",1,"normal",24,10,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Incline Bench Press (Dumbbell)",,"",2,"normal",28,5,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Chest Fly (Machine)",,"",0,"normal",45,12,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Chest Fly (Machine)",,"",1,"normal",52,8,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Chest Fly (Machine)",,"",2,"normal",59,5,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Chest Press (Machine)",,"",0,"normal",32,6,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Seated Shoulder Press (Machine)",,"",0,"normal",18,10,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Seated Shoulder Press (Machine)",,"",1,"normal",23,7,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Lateral Raise (Dumbbell)",,"",0,"normal",8,8,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Lateral Raise (Dumbbell)",,"",1,"normal",6,12,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Lateral Raise (Dumbbell)",,"",2,"normal",6,10,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Seated Palms Up Wrist Curl",,"",0,"normal",6,15,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Seated Palms Up Wrist Curl",,"",1,"normal",12,12,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Single Arm Triceps Pushdown (Cable)",,"",0,"normal",4.5,12,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Single Arm Triceps Pushdown (Cable)",,"",1,"normal",5.75,8,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Triceps Extension (Cable)",,"",0,"normal",2.3,6,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Triceps Extension (Cable)",,"",1,"normal",2.3,7,,,
+"PUSH PUSH PUSH","Jun 2, 2026, 1:44 PM","Jun 2, 2026, 2:39 PM","","Triceps Rope Pushdown",,"",0,"normal",11.3,8,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Cycling",,"",0,"normal",,,,600,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Shoulder Press (Dumbbell)",,"",0,"warmup",8,12,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Shoulder Press (Dumbbell)",,"",1,"normal",16,12,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Shoulder Press (Dumbbell)",,"",2,"normal",20,10,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Shoulder Press (Dumbbell)",,"",3,"normal",24,5,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Lat Pulldown (Machine)",,"Machine",0,"normal",27,12,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Lat Pulldown (Machine)",,"Machine",1,"normal",32,10,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Lat Pulldown (Machine)",,"Machine",2,"normal",36,8,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Chest Press (Machine)",,"",0,"normal",25,9,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Chest Press (Machine)",,"",1,"normal",32,4,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Seated Row (Machine)",,"Wide grip",0,"normal",23,10,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Seated Row (Machine)",,"Wide grip",1,"normal",27,8,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Rear Delt Reverse Fly (Machine)",,"",0,"normal",18,12,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Rear Delt Reverse Fly (Machine)",,"",1,"normal",25,10,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Triceps Rope Pushdown",,"",0,"normal",11.3,11,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Triceps Rope Pushdown",,"",1,"normal",13.5,7,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Preacher Curl (Machine)",,"",0,"normal",23,10,,,
+"UPPER","May 31, 2026, 10:36 AM","May 31, 2026, 11:31 AM","","Preacher Curl (Machine)",,"",1,"normal",27,8,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Cycling",,"",0,"normal",,,,600,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Hack Squat (Machine)",,"",0,"normal",10,12,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Hack Squat (Machine)",,"",1,"normal",20,8,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Hack Squat (Machine)",,"",2,"normal",20,7,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Calve Raises (Free Weight)",,"",0,"normal",10,12,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Calve Raises (Free Weight)",,"",1,"normal",15,12,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Calve Raises (Free Weight)",,"",2,"normal",20,10,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Leg Extension (Machine)",,"",0,"normal",25,12,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Leg Extension (Machine)",,"",1,"normal",32,10,,,
+"LEGS","May 30, 2026, 2:12 PM","May 30, 2026, 3:00 PM","","Leg Extension (Machine)",,"",2,"normal",39,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Cycling",,"",0,"normal",,,,600,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Cable Row - V Grip (Cable)",,"",0,"warmup",25,12,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Cable Row - V Grip (Cable)",,"",1,"normal",32,10,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Cable Row - V Grip (Cable)",,"",2,"normal",39,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Lat Pulldown (Free-Weight)",,"",0,"normal",20,12,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Lat Pulldown (Free-Weight)",,"",1,"normal",40,12,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Lat Pulldown (Free-Weight)",,"",2,"normal",70,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Straight Arm Lat Pulldown (Cable)",,"",0,"normal",13.5,10,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Straight Arm Lat Pulldown (Cable)",,"",1,"normal",15.8,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Straight Arm Lat Pulldown (Cable)",,"",2,"normal",18,5,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Cable Row - Bar Wide Grip",,"",0,"normal",32,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Cable Row - Bar Wide Grip",,"",1,"normal",39,4,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Rear Delt Reverse Fly (Machine)",,"",0,"normal",11,12,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Rear Delt Reverse Fly (Machine)",,"",1,"normal",18,10,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Rear Delt Reverse Fly (Machine)",,"",2,"normal",25,10,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Incline Curl (Dumbbell)",,"",0,"normal",12,10,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Seated Incline Curl (Dumbbell)",,"",1,"normal",16,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Hammer Curl (Cable)",,"",0,"normal",11.3,8,,,
+"PULL PULL PULL","May 28, 2026, 10:43 AM","May 28, 2026, 11:58 AM","","Hammer Curl (Cable)",,"",1,"normal",13.5,6,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Cycling",,"",0,"normal",,,,600,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Incline Bench Press (Dumbbell)",,"",0,"warmup",16,12,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Incline Bench Press (Dumbbell)",,"",1,"normal",24,9,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Incline Bench Press (Dumbbell)",,"",2,"normal",28,5,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Press (Machine)",,"",0,"normal",25,10,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Press (Machine)",,"",1,"normal",32,5,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Press (Machine)",,"",2,"normal",34.3,4,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Fly (Machine)",,"",0,"normal",39,10,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Fly (Machine)",,"",1,"normal",45,8,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Chest Fly (Machine)",,"",2,"normal",52,6,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Seated Shoulder Press (Machine)",,"",0,"normal",14,10,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Seated Shoulder Press (Machine)",,"",1,"normal",18,8,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Seated Shoulder Press (Machine)",,"",2,"normal",21.3,8,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Single Arm Lateral Raise (Cable)",,"",0,"normal",2.5,10,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Single Arm Lateral Raise (Cable)",,"",1,"normal",3.75,8,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Single Arm Triceps Pushdown (Cable)",,"",0,"normal",4.5,12,,,
+"PUSH PUSH PUSH","May 26, 2026, 10:53 AM","May 26, 2026, 11:51 AM","","Single Arm Triceps Pushdown (Cable)",,"",1,"normal",5.75,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Cycling",,"",0,"normal",,,,600,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Shoulder Press (Dumbbell)",,"",0,"warmup",8,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Shoulder Press (Dumbbell)",,"",1,"normal",16,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Shoulder Press (Dumbbell)",,"",2,"normal",20,10,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Shoulder Press (Dumbbell)",,"",3,"normal",24,4,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Single Arm Lateral Raise (Cable)",,"",0,"normal",2.5,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Single Arm Lateral Raise (Cable)",,"",1,"normal",5,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Single Arm Lateral Raise (Cable)",,"",2,"normal",5,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Face Pull",,"",0,"normal",10,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Face Pull",,"",1,"normal",12.5,10,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Face Pull",,"",2,"normal",15,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Seated Shoulder Press (Machine)",,"",0,"normal",10,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Seated Shoulder Press (Machine)",,"",1,"normal",12.5,5,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Seated Incline Curl (Dumbbell)",,"",0,"normal",12,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Seated Incline Curl (Dumbbell)",,"",1,"normal",16,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Seated Incline Curl (Dumbbell)",,"",2,"normal",16,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Triceps Rope Pushdown",,"",0,"normal",10,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Triceps Rope Pushdown",,"",1,"normal",12.5,10,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Triceps Rope Pushdown",,"",2,"normal",15,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Preacher Curl (Dumbbell)",,"",0,"normal",12,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Preacher Curl (Dumbbell)",,"",1,"normal",16,10,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Preacher Curl (Dumbbell)",,"",2,"normal",18,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Overhead Triceps Extension (Cable)",,"",0,"normal",7.5,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Overhead Triceps Extension (Cable)",,"",1,"normal",12.5,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Overhead Triceps Extension (Cable)",,"",2,"normal",12.5,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Hammer Curl (Dumbbell)",,"",0,"normal",12,12,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Hammer Curl (Dumbbell)",,"",1,"normal",14,8,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Hammer Curl (Dumbbell)",,"",2,"normal",16,6,,,
+"Shoulders & Arms","May 20, 2026, 3:39 PM","May 20, 2026, 5:16 PM","","Elliptical Trainer",,"",0,"normal",,,,600,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Cycling",,"",0,"normal",,,,600,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Lat Pulldown (Cable)",,"",0,"warmup",18,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Lat Pulldown (Cable)",,"",1,"normal",25,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Lat Pulldown (Cable)",,"",2,"normal",32,10,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Lat Pulldown (Cable)",,"",3,"normal",39,8,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Seated Row (Machine)",,"",0,"normal",18,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Seated Row (Machine)",,"",1,"normal",25,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Seated Row (Machine)",,"",2,"normal",32,10,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Seated Row (Machine)",,"",3,"normal",39,8,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Straight Arm Lat Pulldown (Cable)",,"",0,"normal",11,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Straight Arm Lat Pulldown (Cable)",,"",1,"normal",13.5,10,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Straight Arm Lat Pulldown (Cable)",,"",2,"normal",15,7,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Bicep Curl (Cable)",,"",0,"normal",9,12,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Bicep Curl (Cable)",,"",1,"normal",11,7,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Bicep Curl (Cable)",,"",2,"normal",11,6,,,
+"Back & Biceps","May 18, 2026, 10:02 AM","May 18, 2026, 11:01 AM","","Elliptical Trainer",,"",0,"normal",,,,600,
