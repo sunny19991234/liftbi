@@ -1,10 +1,20 @@
 // src/lib/homeData.js
 //
 // Verzamelt de samengevatte data voor de homepage: eerstvolgende geplande
-// sessie, een dagstrip (recente + komende dagen) en het totale weekvolume.
+// sessie, een dagstrip (recente + komende dagen) en het weekvolume (huidige
+// + vorige kalenderweek).
+//
+// BELANGRIJK: "deze week" is hier altijd de volledige kalenderweek
+// (maandag t/m zondag), niet "maandag t/m vandaag". Dat is dezelfde
+// week-definitie als VolumeDashboard.jsx/dashboardQueries.js
+// (getWeekStart) en imbalanceData.js -- eerder telde fetchWeekVolume hier
+// alleen t/m vandaag, waardoor het cijfer op Home structureel lager was
+// dan in de Volume-tab voor dezelfde week. Door consistent de hele
+// kalenderweek te tellen kunnen de schermen niet meer uit elkaar lopen.
 
 import { supabase } from './supabase'
 import { getTodayStr } from './calendarData'
+import { getWeekStart } from './dashboardQueries'
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00')
@@ -68,39 +78,62 @@ export async function fetchDayStrip(daysBack = 3, daysForward = 3) {
 }
 
 /**
- * Totaal volume (sets + kg) van de huidige kalenderweek (maandag t/m
- * vandaag), opgeteld over alle spiergroepen. Telt elke uitgevoerde set
- * één keer (niet gewogen per spiergroep-contributie), want dit is totaal
- * trainingsvolume, geen spiergroep-specifieke metric.
+ * Telt sets/volume/gem.RPE op voor een gegeven kalenderweek (maandag t/m
+ * zondag, op basis van weekStartDate = de maandag van die week).
  */
-export async function fetchWeekVolume() {
-  const today = getTodayStr()
-  const todayDate = new Date(today + 'T00:00:00')
-  const dayOfWeek = todayDate.getDay() // 0 = zondag
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const monday = addDays(today, diffToMonday)
+async function fetchVolumeForWeek(weekStartDate) {
+  const weekEndDate = addDays(weekStartDate, 6)
 
   const { data: workouts, error: wErr } = await supabase
     .from('workouts')
     .select('id')
-    .gte('start_date', monday)
-    .lte('start_date', today)
+    .gte('start_date', weekStartDate)
+    .lte('start_date', weekEndDate)
   if (wErr) throw wErr
 
-  if (workouts.length === 0) return { setCount: 0, volumeKg: 0, weekStart: monday }
+  if (workouts.length === 0) {
+    return { setCount: 0, volumeKg: 0, avgRpe: null, weekStart: weekStartDate, weekEnd: weekEndDate }
+  }
 
   const { data: sets, error: sErr } = await supabase
     .from('sets')
-    .select('weight_kg, reps')
+    .select('weight_kg, reps, rpe')
     .in('workout_id', workouts.map((w) => w.id))
   if (sErr) throw sErr
 
   let setCount = 0
   let volumeKg = 0
+  let rpeSum = 0
+  let rpeCount = 0
   for (const s of sets) {
     setCount += 1
     if (s.weight_kg != null && s.reps != null) volumeKg += s.weight_kg * s.reps
+    if (s.rpe != null) { rpeSum += s.rpe; rpeCount += 1 }
   }
 
-  return { setCount, volumeKg: Math.round(volumeKg), weekStart: monday }
+  return {
+    setCount,
+    volumeKg: Math.round(volumeKg),
+    avgRpe: rpeCount > 0 ? Math.round((rpeSum / rpeCount) * 10) / 10 : null,
+    weekStart: weekStartDate,
+    weekEnd: weekEndDate,
+  }
+}
+
+/**
+ * Volledige huidige kalenderweek (maandag t/m zondag), inclusief dagen die
+ * nog moeten komen -- consistent met de Volume-tab, niet "tot nu".
+ */
+export async function fetchWeekVolume() {
+  const currentWeekStart = getWeekStart(getTodayStr())
+  return fetchVolumeForWeek(currentWeekStart)
+}
+
+/**
+ * Vorige volledige kalenderweek (maandag t/m zondag).
+ */
+export async function fetchPreviousWeekVolume() {
+  const currentWeekStart = getWeekStart(getTodayStr())
+  const previousWeekStart = addDays(currentWeekStart, -7)
+  return fetchVolumeForWeek(previousWeekStart)
 }

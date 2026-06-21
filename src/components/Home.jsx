@@ -1,18 +1,19 @@
 // src/components/Home.jsx
 //
-// Startpagina: samenvatting van wat er nu toe doet -- eerstvolgende
-// geplande sessie naast een compact weekvolume-blok, een proactief
-// plateau-signaal (PRD 4.12, op basis van e1RM zodat reps-progressie niet
-// als stagnatie wordt gezien), een disbalans-signaal (PRD 4.7, alleen
-// afwijkingen, exact dezelfde week-aggregatie als de Volume-tab), de top 5
-// grootste PR's, een dagstrip, en een compacte upload-kaart.
+// Startpagina: compacte hero met eerstvolgende geplande sessie naast het
+// weekvolume-blok (sets/kg/gem.RPE, volledige kalenderweek), een
+// vorige-weekkaartje ter vergelijking, een proactief plateau-signaal
+// (PRD 4.12, op basis van e1RM zodat reps-progressie niet als stagnatie
+// wordt gezien), een disbalans-signaal (PRD 4.7, alleen afwijkingen,
+// exact dezelfde week-aggregatie als de Volume-tab), de top 5 grootste
+// PR's, een dagstrip, en een compacte upload-kaart.
 //
 // Visueel signature-moment van de app: de hero-kaart krijgt de gestaalde
-// .surface-hero behandeling (subtiele lichtstreep, diepere schaduw) -- de
-// boldness wordt hier besteed, de rest van het scherm blijft rustig.
+// .surface-hero behandeling (subtiele lichtstreep) -- bewust compact
+// gehouden zodat de rest van het scherm meer ruimte krijgt.
 
 import { useEffect, useRef, useState } from 'react'
-import { fetchNextPlanned, fetchDayStrip, fetchWeekVolume } from '../lib/homeData'
+import { fetchNextPlanned, fetchDayStrip, fetchWeekVolume, fetchPreviousWeekVolume } from '../lib/homeData'
 import { getTodayStr } from '../lib/calendarData'
 import { detectPlateaus } from '../lib/plateauData'
 import { detectImbalances } from '../lib/imbalanceData'
@@ -31,6 +32,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
   const [nextPlanned, setNextPlanned] = useState(undefined) // undefined = loading, null = none
   const [dayStrip, setDayStrip] = useState(null)
   const [weekVolume, setWeekVolume] = useState(null)
+  const [prevWeekVolume, setPrevWeekVolume] = useState(null)
   const [plateaus, setPlateaus] = useState(null) // null = loading, [] = geen plateaus
   const [imbalances, setImbalances] = useState(null)
   const [topPRs, setTopPRs] = useState(null)
@@ -43,14 +45,16 @@ export default function Home({ onNavigate, onTokenExpired }) {
       fetchNextPlanned(),
       fetchDayStrip(),
       fetchWeekVolume(),
+      fetchPreviousWeekVolume(),
       detectPlateaus(),
       detectImbalances(),
       calculateAllPRs(),
     ])
-      .then(([next, strip, vol, plateauList, imbalanceList, allPRs]) => {
+      .then(([next, strip, vol, prevVol, plateauList, imbalanceList, allPRs]) => {
         setNextPlanned(next)
         setDayStrip(strip)
         setWeekVolume(vol)
+        setPrevWeekVolume(prevVol)
         setPlateaus(plateauList)
         setImbalances(imbalanceList)
         setTopPRs(rankTopPRs(allPRs, 5))
@@ -72,16 +76,16 @@ export default function Home({ onNavigate, onTokenExpired }) {
 
   return (
     <div className="max-w-3xl mx-auto p-plate-4 flex flex-col gap-plate-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-plate-3 items-stretch">
-        <div className="sm:col-span-2">
-          <NextSessionCard
-            nextPlanned={nextPlanned}
-            todayInfo={todayInfo}
-            todayIsRestDay={todayIsRestDay}
-            onNavigate={onNavigate}
-          />
-        </div>
-        <WeekVolumeCard weekVolume={weekVolume} onNavigate={onNavigate} />
+      <NextSessionCard
+        nextPlanned={nextPlanned}
+        todayInfo={todayInfo}
+        todayIsRestDay={todayIsRestDay}
+        onNavigate={onNavigate}
+      />
+
+      <div className="grid grid-cols-2 gap-plate-3">
+        <WeekVolumeCard label="Deze week" weekVolume={weekVolume} onNavigate={onNavigate} highlight />
+        <WeekVolumeCard label="Vorige week" weekVolume={prevWeekVolume} onNavigate={onNavigate} />
       </div>
 
       <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
@@ -391,10 +395,12 @@ function WeightSparkline({ weights }) {
   )
 }
 
+// Compacte hero: status van vandaag + link naar volgende sessie, geen
+// grote koppen meer. Eén regel hoog qua hiërarchie, niet een dominant blok.
 function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate }) {
   if (nextPlanned === undefined) {
     return (
-      <div className="surface-hero rounded-2xl p-plate-3 h-full flex items-center">
+      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center">
         <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
       </div>
     )
@@ -402,37 +408,37 @@ function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate })
 
   if (todayInfo?.type === 'done') {
     return (
-      <div className="surface-hero rounded-2xl p-plate-3 h-full">
-        <div className="loaded-bar -mx-plate-3 -mt-plate-3 mb-plate-2 rounded-t-2xl" style={{ '--load-pct': '100%' }} />
-        <p className="text-xs text-[var(--color-status-ok)] font-[var(--font-mono)] tracking-wide uppercase mb-1">
-          Vandaag voltooid
-        </p>
-        <h2 className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-text-primary)] tracking-tight">
-          {todayInfo.title}
-        </h2>
+      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] text-[var(--color-status-ok)] font-[var(--font-mono)] tracking-wide uppercase">
+            Vandaag voltooid
+          </p>
+          <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight">
+            {todayInfo.title}
+          </h2>
+        </div>
       </div>
     )
   }
 
   if (todayIsRestDay && !nextPlanned) {
     return (
-      <div className="surface-hero rounded-2xl p-plate-3 h-full flex flex-col justify-center text-center">
-        <p className="text-xs text-[var(--color-text-tertiary)] font-[var(--font-mono)] tracking-wide uppercase mb-1">
-          Vandaag
-        </p>
-        <h2 className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-text-primary)] tracking-tight">
-          Rustdag
-        </h2>
-        <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-body)] mt-1">
-          Niets gepland voor vandaag.
-        </p>
+      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center justify-between">
+        <div>
+          <p className="text-[10px] text-[var(--color-text-tertiary)] font-[var(--font-mono)] tracking-wide uppercase">
+            Vandaag
+          </p>
+          <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight">
+            Rustdag
+          </h2>
+        </div>
       </div>
     )
   }
 
   if (!nextPlanned) {
     return (
-      <div className="surface rounded-2xl p-plate-3 h-full flex items-center">
+      <div className="surface rounded-xl px-plate-3 py-plate-2 flex items-center">
         <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-body)]">
           Geen geplande sessies. Plan er een in de Agenda.
         </p>
@@ -445,21 +451,19 @@ function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate })
   return (
     <button
       onClick={() => onNavigate('agenda')}
-      className="surface-hero text-left rounded-2xl p-plate-3 h-full w-full hover:brightness-110 transition-all group"
+      className="surface-hero text-left rounded-xl px-plate-3 py-plate-2 w-full hover:brightness-110 transition-all group flex items-center justify-between"
     >
-      <div className="loaded-bar -mx-plate-3 -mt-plate-3 mb-plate-2 rounded-t-2xl" style={{ '--load-pct': '60%' }} />
-      <p className="text-xs text-[var(--color-data)] font-[var(--font-mono)] tracking-wide uppercase mb-1">
-        {isToday ? 'Vandaag gepland' : 'Volgende sessie'}
-      </p>
-      <h2 className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-text-primary)] tracking-tight group-hover:text-white transition-colors">
-        {nextPlanned.title}
-      </h2>
-      <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-mono)] mt-1 tabular-data">
+      <div>
+        <p className="text-[10px] text-[var(--color-data)] font-[var(--font-mono)] tracking-wide uppercase">
+          {isToday ? 'Vandaag gepland' : 'Volgende sessie'}
+        </p>
+        <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight group-hover:text-white transition-colors">
+          {nextPlanned.title}
+        </h2>
+      </div>
+      <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] tabular-data flex-shrink-0">
         {nextPlanned.planned_date}
       </p>
-      {nextPlanned.notes && (
-        <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-body)] mt-2">{nextPlanned.notes}</p>
-      )}
     </button>
   )
 }
@@ -517,30 +521,41 @@ function DayStrip({ days, onNavigate }) {
   )
 }
 
-function WeekVolumeCard({ weekVolume, onNavigate }) {
+// Eén kaart-component voor zowel "deze week" als "vorige week" -- exact
+// dezelfde drie metrics (sets, kg, gem. RPE), zodat ze direct vergelijkbaar
+// naast elkaar staan. `highlight` geeft de huidige week een accentrand.
+function WeekVolumeCard({ label, weekVolume, onNavigate, highlight = false }) {
   return (
     <button
       onClick={() => onNavigate('volume')}
-      className="surface text-left rounded-2xl p-plate-3 h-full hover:brightness-110 transition-all flex flex-col justify-center"
+      className={`surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all flex flex-col justify-center ${
+        highlight ? 'border-l-2 border-[var(--color-accent)]' : ''
+      }`}
     >
       <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-xs mb-plate-2">
-        Volume deze week
+        {label}
       </p>
       {!weekVolume ? (
         <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
       ) : (
-        <div className="flex flex-col gap-plate-1">
+        <div className="flex items-end gap-plate-3">
           <div>
-            <p className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-text-primary)] tabular-data tracking-tight leading-none">
+            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-text-primary)] tabular-data tracking-tight leading-none">
               {weekVolume.setCount}
             </p>
-            <p className="text-[10px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">sets</p>
+            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">sets</p>
           </div>
           <div>
-            <p className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-accent)] tabular-data tracking-tight leading-none">
+            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-accent)] tabular-data tracking-tight leading-none">
               {formatKg(weekVolume.volumeKg)}
             </p>
-            <p className="text-[10px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">kg totaal</p>
+            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">kg</p>
+          </div>
+          <div>
+            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-data)] tabular-data tracking-tight leading-none">
+              {weekVolume.avgRpe ?? '—'}
+            </p>
+            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">RPE</p>
           </div>
         </div>
       )}
