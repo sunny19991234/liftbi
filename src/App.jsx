@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { isLoggedIn } from './lib/auth'
 import Login from './components/Login'
 import Home from './components/Home'
-import Upload from './components/Upload'
 import VolumeDashboard from './components/VolumeDashboard'
 import RpeTrend from './components/RpeTrend'
 import Agenda from './components/Agenda'
@@ -20,7 +19,6 @@ const TABS = [
   { id: 'agenda', label: 'Agenda' },
   { id: 'sessions', label: 'Sessies' },
   { id: 'mapping', label: 'Oefeningen' },
-  { id: 'upload', label: 'Upload' },
 ]
 
 function App() {
@@ -63,7 +61,7 @@ function App() {
         <div className="loaded-bar rounded-full" style={{ '--load-pct': '100%' }} />
       </header>
 
-      {tab === 'home' && <Home onNavigate={setTab} />}
+      {tab === 'home' && <Home onNavigate={setTab} onTokenExpired={() => setLoggedIn(false)} />}
       {tab === 'volume' && <VolumeDashboard />}
       {tab === 'rpe' && <RpeTrend />}
       {tab === 'maand' && <MonthlyComparison />}
@@ -76,7 +74,6 @@ function App() {
         />
       )}
       {tab === 'mapping' && <MuscleGroupMapping />}
-      {tab === 'upload' && <Upload onTokenExpired={() => setLoggedIn(false)} />}
     </div>
   )
 }
