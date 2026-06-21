@@ -2,7 +2,9 @@
 //
 // Startpagina: samenvatting van wat er nu toe doet -- eerstvolgende
 // geplande sessie (of rustdag-signaal als vandaag niets gepland/uitgevoerd
-// is), een dagstrip met recente + komende dagen, en het weekvolume tot nu.
+// is), een dagstrip met recente + komende dagen, het weekvolume tot nu, en
+// een proactief plateau-signaal (PRD 4.12) als er stagnerende oefeningen
+// gevonden worden.
 //
 // Visueel signature-moment van de app: de hero-kaart krijgt de gestaalde
 // .surface-hero behandeling (subtiele lichtstreep, diepere schaduw) -- de
@@ -11,6 +13,7 @@
 import { useEffect, useState } from 'react'
 import { fetchNextPlanned, fetchDayStrip, fetchWeekVolume } from '../lib/homeData'
 import { getTodayStr } from '../lib/calendarData'
+import { detectPlateaus } from '../lib/plateauData'
 
 const WEEKDAY_SHORT = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 
@@ -18,16 +21,18 @@ export default function Home({ onNavigate }) {
   const [nextPlanned, setNextPlanned] = useState(undefined) // undefined = loading, null = none
   const [dayStrip, setDayStrip] = useState(null)
   const [weekVolume, setWeekVolume] = useState(null)
+  const [plateaus, setPlateaus] = useState(null) // null = loading, [] = geen plateaus
   const [error, setError] = useState(null)
 
   const today = getTodayStr()
 
   useEffect(() => {
-    Promise.all([fetchNextPlanned(), fetchDayStrip(), fetchWeekVolume()])
-      .then(([next, strip, vol]) => {
+    Promise.all([fetchNextPlanned(), fetchDayStrip(), fetchWeekVolume(), detectPlateaus()])
+      .then(([next, strip, vol, plateauList]) => {
         setNextPlanned(next)
         setDayStrip(strip)
         setWeekVolume(vol)
+        setPlateaus(plateauList)
       })
       .catch((err) => setError(err.message))
   }, [])
@@ -48,6 +53,10 @@ export default function Home({ onNavigate }) {
         onNavigate={onNavigate}
       />
 
+      {plateaus && plateaus.length > 0 && (
+        <PlateauSignal plateaus={plateaus} onNavigate={onNavigate} />
+      )}
+
       <div className="surface rounded-xl p-plate-3">
         <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm mb-plate-2">
           Recent & aankomend
@@ -61,6 +70,37 @@ export default function Home({ onNavigate }) {
 
       <WeekVolumeCard weekVolume={weekVolume} onNavigate={onNavigate} />
     </div>
+  )
+}
+
+function PlateauSignal({ plateaus, onNavigate }) {
+  const visible = plateaus.slice(0, 3)
+  const extra = plateaus.length - visible.length
+
+  return (
+    <button
+      onClick={() => onNavigate('rpe')}
+      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all border-l-2 border-[var(--color-status-low)]"
+    >
+      <div className="flex items-center justify-between mb-plate-2">
+        <p className="text-xs text-[var(--color-status-low)] font-[var(--font-mono)] tracking-wide uppercase">
+          {plateaus.length === 1 ? '1 oefening stagneert' : `${plateaus.length} oefeningen stagneren`}
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        {visible.map((p) => (
+          <div key={p.exercise_title} className="flex items-center justify-between">
+            <span className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{p.exercise_title}</span>
+            <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data">
+              gewicht {p.weightTrend} · RPE {p.rpeTrend}
+            </span>
+          </div>
+        ))}
+        {extra > 0 && (
+          <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-tertiary)] mt-1">+{extra} meer</span>
+        )}
+      </div>
+    </button>
   )
 }
 

@@ -8,11 +8,15 @@ import RpeTrend from './components/RpeTrend'
 import Agenda from './components/Agenda'
 import Sessions from './components/Sessions'
 import MuscleGroupMapping from './components/MuscleGroupMapping'
+import MonthlyComparison from './components/MonthlyComparison'
+import PersonalRecords from './components/PersonalRecords'
 
 const TABS = [
   { id: 'home', label: 'Home' },
   { id: 'volume', label: 'Volume' },
   { id: 'rpe', label: 'RPE-trend' },
+  { id: 'maand', label: 'Maandvergelijking' },
+  { id: 'prs', label: "PR's" },
   { id: 'agenda', label: 'Agenda' },
   { id: 'sessions', label: 'Sessies' },
   { id: 'mapping', label: 'Oefeningen' },
@@ -62,6 +66,8 @@ function App() {
       {tab === 'home' && <Home onNavigate={setTab} />}
       {tab === 'volume' && <VolumeDashboard />}
       {tab === 'rpe' && <RpeTrend />}
+      {tab === 'maand' && <MonthlyComparison />}
+      {tab === 'prs' && <PersonalRecords />}
       {tab === 'agenda' && <Agenda onViewSession={goToSession} />}
       {tab === 'sessions' && (
         <Sessions
