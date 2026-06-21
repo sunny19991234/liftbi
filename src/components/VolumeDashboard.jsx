@@ -15,6 +15,19 @@ import { fetchSetsWithMuscleGroups, fetchVolumeTargets, getWeekStart } from '../
 const AXIS_STYLE = { fill: '#9499A1', fontSize: 11, fontFamily: 'JetBrains Mono' }
 const GRID_COLOR = '#24272C'
 
+function getIsoWeekNumber(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+  const weekOne = new Date(d.getFullYear(), 0, 4)
+  return 1 + Math.round(((d - weekOne) / 86400000 - 3 + ((weekOne.getDay() + 6) % 7)) / 7)
+}
+
+function formatWeekLabel(weekStart) {
+  const [, month, day] = weekStart.split('-')
+  return `${day}/${month} W${getIsoWeekNumber(weekStart)}`
+}
+
 function ChartTooltip({ active, payload, label, suffix }) {
   if (!active || !payload?.length) return null
   return (
@@ -88,7 +101,7 @@ export default function VolumeDashboard() {
       .sort((a, b) => a.week.localeCompare(b.week))
       .map((e) => ({
         ...e,
-        weekLabel: e.week.slice(5).replace('-', '/'),
+        weekLabel: formatWeekLabel(e.week),
         setCount: Math.round(e.setCount * 10) / 10,
         volumeKg: Math.round(e.volumeKg),
       }))
@@ -162,10 +175,10 @@ export default function VolumeDashboard() {
               )}
             </div>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={weeklyData} margin={{ top: 18, right: 8, left: -16, bottom: 0 }}>
+              <BarChart data={weeklyData} margin={{ top: 18, right: 8, left: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="2 4" stroke={GRID_COLOR} vertical={false} />
                 <XAxis dataKey="weekLabel" tick={AXIS_STYLE} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
-                <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={32} />
+                <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={48} />
                 <Tooltip content={<ChartTooltip suffix=" sets" />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 {target && (
                   <>
@@ -200,10 +213,10 @@ export default function VolumeDashboard() {
               </p>
             </div>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={weeklyData} margin={{ top: 18, right: 8, left: -16, bottom: 0 }}>
+              <BarChart data={weeklyData} margin={{ top: 18, right: 8, left: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="2 4" stroke={GRID_COLOR} vertical={false} />
                 <XAxis dataKey="weekLabel" tick={AXIS_STYLE} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
-                <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={40} />
+                <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={64} />
                 <Tooltip content={<ChartTooltip suffix=" kg" />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Bar dataKey="volumeKg" fill="#FF4B3E" radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive animationDuration={500}>
                   <LabelList dataKey="volumeKg" content={<ValueLabel />} />

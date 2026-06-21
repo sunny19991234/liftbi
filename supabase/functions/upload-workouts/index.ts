@@ -15,7 +15,8 @@
 // - Na het aanmaken/updaten van een workout wordt gezocht naar een
 //   planned_workouts-rij met status 'planned', gelijke title en gelijke
 //   planned_date (= lokale kalenderdag van start_time). Bij match wordt
-//   die rij op status 'done' gezet met linked_workout = workout.id.
+//   die rij gekoppeld met linked_workout = workout.id. De status blijft
+//   'planned': uitgevoerde dagen worden in de app afgeleid uit de workouts-tabel.
 // - Geen match: planned_workouts blijft ongemoeid (geen plan = geen actie).
 //
 // Response: { created: number, updated: number, sessionResults: [...] }
@@ -136,6 +137,12 @@ Deno.serve(async (req: Request) => {
         month: '2-digit',
         day: '2-digit',
       }).format(new Date(session.start_time))
+      const todayDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Amsterdam',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
 
       // Zoek bestaande workout met gelijke titel + lokale dag.
       const { data: existing, error: lookupError } = await supabase
@@ -224,7 +231,9 @@ Deno.serve(async (req: Request) => {
       }
 
       // Agenda-koppeling: zoek een geplande sessie met gelijke titel +
-      // gelijke dag die nog openstaat, en markeer die als 'done'.
+      // gelijke dag die nog openstaat, en koppel die aan deze workout.
+      // planned_workouts.status accepteert alleen planningstatussen; de
+      // kalender toont uitvoering via de workouts-tabel.
       let plannedMatch = false
       const { data: plannedRow, error: plannedLookupError } = await supabase
         .from('planned_workouts')
@@ -239,7 +248,7 @@ Deno.serve(async (req: Request) => {
       if (plannedRow) {
         const { error: plannedUpdateError } = await supabase
           .from('planned_workouts')
-          .update({ status: 'done', linked_workout_id: workoutId })
+          .update({ linked_workout_id: workoutId })
           .eq('id', plannedRow.id)
         if (plannedUpdateError) throw plannedUpdateError
         plannedMatch = true
@@ -252,16 +261,12 @@ Deno.serve(async (req: Request) => {
         plannedMatch,
       })
 
-      // AI-analyse triggeren conform PRD 4.5 -- uitsluitend voor nieuw
-      // aangemaakte sessies. Bestaande/ge-update sessies krijgen nooit
-      // automatisch een analyse: dat zou met terugwerkende kracht oude
-      // data analyseren bij een hernieuwde upload, wat niet de bedoeling
-      // is. analyze-session vereist een geldig HS256-token (zelfde check
-      // als alle andere Edge Functions, zie _shared/auth.ts) -- de
-      // service-role key voldoet daar niet aan, dus we signen hier een
-      // kortlevend intern token met hetzelfde secret. Fouten hierin laten
-      // de upload zelf niet falen.
-      if (!existing) {
+      // AI-analyse triggeren voor sessies vanaf vandaag. Zo kan een
+      // her-upload van de huidige sessie een eerder gemiste analyse alsnog
+      // vullen, zonder historische workouts met terugwerkende kracht te
+      // analyseren. analyze-session is idempotent en slaat over als er al
+      // een ai_analyses-rij voor deze workout bestaat.
+      if (localDate >= todayDate) {
         try {
           const internalToken = await createInternalToken()
           const analyzeRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-session`, {

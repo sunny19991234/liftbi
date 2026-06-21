@@ -82,7 +82,7 @@ export default function MonthlyComparison() {
     ])
     return [...groups].sort().map((g) => ({
       muscle_group: g,
-      current: selected.byMuscleGroup[g] ?? { setCount: 0, volumeKg: 0 },
+      current: selected.byMuscleGroup[g] ?? { setCount: 0, volumeKg: 0, avgRpe: null },
       previous: previous?.byMuscleGroup[g] ?? null,
     }))
   }, [selected, previous])
@@ -177,28 +177,34 @@ export default function MonthlyComparison() {
         {muscleGroupRows.length === 0 ? (
           <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm">Geen data voor deze maand.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-[var(--color-text-secondary)] font-[var(--font-body)]">
-                <th className="py-plate-1 font-normal">Spiergroep</th>
-                <th className="py-plate-1 font-normal text-right">Sets</th>
-                <th className="py-plate-1 font-normal text-right">vs vorige</th>
-                <th className="py-plate-1 font-normal text-right">Volume (kg)</th>
-                <th className="py-plate-1 font-normal text-right">vs vorige</th>
-              </tr>
-            </thead>
-            <tbody className="font-[var(--font-mono)] tabular-data">
-              {muscleGroupRows.map((row) => (
-                <tr key={row.muscle_group} className="border-b border-[var(--color-bg)] last:border-0">
-                  <td className="py-plate-1 text-[var(--color-text-primary)] font-[var(--font-body)] capitalize">{row.muscle_group}</td>
-                  <td className="py-plate-1 text-right">{row.current.setCount}</td>
-                  <td className="py-plate-1 text-right">{deltaBadge(row.current.setCount, row.previous?.setCount) ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
-                  <td className="py-plate-1 text-right">{row.current.volumeKg}</td>
-                  <td className="py-plate-1 text-right">{deltaBadge(row.current.volumeKg, row.previous?.volumeKg) ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="text-left text-xs text-[var(--color-text-secondary)] font-[var(--font-body)]">
+                  <th className="py-plate-1 font-normal">Spiergroep</th>
+                  <th className="py-plate-1 font-normal text-right">Sets</th>
+                  <th className="py-plate-1 font-normal text-right">vs vorige</th>
+                  <th className="py-plate-1 font-normal text-right">Volume (kg)</th>
+                  <th className="py-plate-1 font-normal text-right">vs vorige</th>
+                  <th className="py-plate-1 font-normal text-right">Gem. RPE</th>
+                  <th className="py-plate-1 font-normal text-right">vs vorige</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="font-[var(--font-mono)] tabular-data">
+                {muscleGroupRows.map((row) => (
+                  <tr key={row.muscle_group} className="border-b border-[var(--color-bg)] last:border-0">
+                    <td className="py-plate-1 text-[var(--color-text-primary)] font-[var(--font-body)] capitalize">{row.muscle_group}</td>
+                    <td className="py-plate-1 text-right">{row.current.setCount}</td>
+                    <td className="py-plate-1 text-right">{deltaBadge(row.current.setCount, row.previous?.setCount) ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
+                    <td className="py-plate-1 text-right">{row.current.volumeKg}</td>
+                    <td className="py-plate-1 text-right">{deltaBadge(row.current.volumeKg, row.previous?.volumeKg) ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
+                    <td className="py-plate-1 text-right">{row.current.avgRpe ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
+                    <td className="py-plate-1 text-right">{deltaBadge(row.current.avgRpe, row.previous?.avgRpe, { higherIsBetter: false }) ?? <span className="text-[var(--color-text-tertiary)]">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

@@ -31,7 +31,7 @@ export function getLastNMonths(n, fromDate = new Date()) {
  *     volumeKg: number,
  *     avgRpe: number | null,
  *     sessionCount: number,
- *     byMuscleGroup: { [muscle_group]: { setCount: number, volumeKg: number } },
+ *     byMuscleGroup: { [muscle_group]: { setCount: number, volumeKg: number, avgRpe: number | null } },
  *   }
  * ] gesorteerd oudste -> nieuwste maand.
  */
@@ -77,7 +77,7 @@ export async function fetchMonthlyComparison(monthsBack = 6) {
     rpeSum: 0,
     rpeCount: 0,
     sessionIds: new Set(),
-    byMuscleGroup: new Map(), // muscle_group -> { setCount, volumeKg }
+    byMuscleGroup: new Map(), // muscle_group -> { setCount, volumeKg, rpeSum, rpeCount }
   }]))
 
   for (const s of sets) {
@@ -95,11 +95,15 @@ export async function fetchMonthlyComparison(monthsBack = 6) {
     ]
     for (const gm of groupMappings) {
       if (!entry.byMuscleGroup.has(gm.muscle_group)) {
-        entry.byMuscleGroup.set(gm.muscle_group, { setCount: 0, volumeKg: 0 })
+        entry.byMuscleGroup.set(gm.muscle_group, { setCount: 0, volumeKg: 0, rpeSum: 0, rpeCount: 0 })
       }
       const mgEntry = entry.byMuscleGroup.get(gm.muscle_group)
       mgEntry.setCount += gm.contribution
       if (s.weight_kg != null && s.reps != null) mgEntry.volumeKg += s.weight_kg * s.reps * gm.contribution
+      if (s.rpe != null) {
+        mgEntry.rpeSum += s.rpe * gm.contribution
+        mgEntry.rpeCount += gm.contribution
+      }
     }
   }
 
@@ -115,7 +119,11 @@ export async function fetchMonthlyComparison(monthsBack = 6) {
       byMuscleGroup: Object.fromEntries(
         [...entry.byMuscleGroup.entries()].map(([k, v]) => [
           k,
-          { setCount: Math.round(v.setCount * 10) / 10, volumeKg: Math.round(v.volumeKg) },
+          {
+            setCount: Math.round(v.setCount * 10) / 10,
+            volumeKg: Math.round(v.volumeKg),
+            avgRpe: v.rpeCount > 0 ? Math.round((v.rpeSum / v.rpeCount) * 10) / 10 : null,
+          },
         ])
       ),
     }
