@@ -2,15 +2,11 @@
 //
 // Startpagina: compacte hero met eerstvolgende geplande sessie naast het
 // weekvolume-blok (sets/kg/gem.RPE, volledige kalenderweek), een
-// vorige-weekkaartje ter vergelijking, een proactief plateau-signaal
+// gecombineerde week-vs-week kaart, een proactief plateau-signaal
 // (PRD 4.12, op basis van e1RM zodat reps-progressie niet als stagnatie
 // wordt gezien), een disbalans-signaal (PRD 4.7, alleen afwijkingen,
 // exact dezelfde week-aggregatie als de Volume-tab), de top 5 grootste
 // PR's, een dagstrip, en een compacte upload-kaart.
-//
-// Visueel signature-moment van de app: de hero-kaart krijgt de gestaalde
-// .surface-hero behandeling (subtiele lichtstreep) -- bewust compact
-// gehouden zodat de rest van het scherm meer ruimte krijgt.
 
 import { useEffect, useRef, useState } from 'react'
 import { fetchNextPlanned, fetchDayStrip, fetchWeekVolume, fetchPreviousWeekVolume } from '../lib/homeData'
@@ -28,12 +24,18 @@ function formatKg(value) {
   return value.toLocaleString('nl-NL')
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const [year, month, day] = dateStr.split('-')
+  return `${day}-${month}-${year}`
+}
+
 export default function Home({ onNavigate, onTokenExpired }) {
-  const [nextPlanned, setNextPlanned] = useState(undefined) // undefined = loading, null = none
+  const [nextPlanned, setNextPlanned] = useState(undefined)
   const [dayStrip, setDayStrip] = useState(null)
   const [weekVolume, setWeekVolume] = useState(null)
   const [prevWeekVolume, setPrevWeekVolume] = useState(null)
-  const [plateaus, setPlateaus] = useState(null) // null = loading, [] = geen plateaus
+  const [plateaus, setPlateaus] = useState(null)
   const [imbalances, setImbalances] = useState(null)
   const [topPRs, setTopPRs] = useState(null)
   const [error, setError] = useState(null)
@@ -83,10 +85,11 @@ export default function Home({ onNavigate, onTokenExpired }) {
         onNavigate={onNavigate}
       />
 
-      <div className="grid grid-cols-2 gap-plate-3">
-        <WeekVolumeCard label="Deze week" weekVolume={weekVolume} onNavigate={onNavigate} highlight />
-        <WeekVolumeCard label="Vorige week" weekVolume={prevWeekVolume} onNavigate={onNavigate} />
-      </div>
+      <WeekComparisonCard
+        weekVolume={weekVolume}
+        prevWeekVolume={prevWeekVolume}
+        onNavigate={onNavigate}
+      />
 
       <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
 
@@ -114,9 +117,6 @@ export default function Home({ onNavigate, onTokenExpired }) {
   )
 }
 
-// Top N PR's op basis van geschat 1RM (meest universeel vergelijkbaar tussen
-// oefeningen). Oefeningen zonder 1RM (bv. hoge-rep-only) vallen hierbuiten --
-// dat is acceptabel, dit is een "zwaarste lifts"-overzicht, geen volledige lijst.
 function rankTopPRs(allPRs, n) {
   return allPRs
     .filter((pr) => pr.oneRepMax !== null)
@@ -124,9 +124,142 @@ function rankTopPRs(allPRs, n) {
     .slice(0, n)
 }
 
+// Gecombineerde week-vs-week kaart.
+// Layout: vorige week (gedimmd, kleiner) links | scheidingslijn met delta-pijl | deze week (prominent) rechts.
+// De deltawaarden animeren in via CSS-transition op opacity zodra data geladen is.
+function WeekComparisonCard({ weekVolume, prevWeekVolume, onNavigate }) {
+  const loaded = weekVolume !== null && prevWeekVolume !== null
+
+  function delta(current, previous) {
+    if (!previous || previous === 0) return null
+    const pct = Math.round(((current - previous) / previous) * 100)
+    return pct
+  }
+
+  const volDelta = loaded ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg) : null
+  const setDelta = loaded ? delta(weekVolume.setCount, prevWeekVolume.setCount) : null
+
+  return (
+    <button
+      onClick={() => onNavigate('volume')}
+      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all w-full"
+    >
+      <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-xs mb-plate-3 uppercase tracking-wide">
+        Week-vergelijking
+      </p>
+
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-plate-2">
+        {/* Vorige week — gedimmd */}
+        <div className="opacity-40">
+          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-tertiary)] mb-plate-2 uppercase tracking-wide">
+            Vorige week
+          </p>
+          {!prevWeekVolume ? (
+            <p className="text-[var(--color-text-tertiary)] font-[var(--font-mono)] text-sm">—</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <WeekMetric label="sets" value={prevWeekVolume.setCount} color="text-[var(--color-text-primary)]" size="small" />
+              <WeekMetric label="kg" value={formatKg(prevWeekVolume.volumeKg)} color="text-[var(--color-text-primary)]" size="small" />
+              <WeekMetric label="RPE" value={prevWeekVolume.avgRpe ?? '—'} color="text-[var(--color-text-primary)]" size="small" />
+            </div>
+          )}
+        </div>
+
+        {/* Scheidingslijn + delta */}
+        <div className="flex flex-col items-center gap-2 px-plate-1">
+          <div className="w-px bg-[var(--color-border)] flex-1 min-h-[60px]" />
+          {loaded && volDelta !== null && (
+            <DeltaPill pct={volDelta} />
+          )}
+          <div className="w-px bg-[var(--color-border)] flex-1 min-h-[20px]" />
+        </div>
+
+        {/* Deze week — prominent */}
+        <div>
+          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-accent)] mb-plate-2 uppercase tracking-wide">
+            Deze week
+          </p>
+          {!weekVolume ? (
+            <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <WeekMetric
+                label="sets"
+                value={weekVolume.setCount}
+                color="text-[var(--color-text-primary)]"
+                size="large"
+                subDelta={setDelta}
+              />
+              <WeekMetric
+                label="kg"
+                value={formatKg(weekVolume.volumeKg)}
+                color="text-[var(--color-accent)]"
+                size="large"
+              />
+              <WeekMetric
+                label="RPE"
+                value={weekVolume.avgRpe ?? '—'}
+                color="text-[var(--color-data)]"
+                size="large"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function WeekMetric({ label, value, color, size, subDelta }) {
+  const numClass = size === 'large'
+    ? `font-[var(--font-display)] font-semibold text-xl tracking-tight leading-none ${color}`
+    : `font-[var(--font-mono)] text-sm leading-none ${color}`
+
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className={`tabular-data ${numClass}`}>{value}</span>
+      <span className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide">
+        {label}
+      </span>
+      {subDelta !== null && subDelta !== undefined && (
+        <span className={`text-[9px] font-[var(--font-mono)] tabular-data ${
+          subDelta > 0 ? 'text-[var(--color-status-ok)]' : subDelta < 0 ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-tertiary)]'
+        }`}>
+          {subDelta > 0 ? `+${subDelta}%` : `${subDelta}%`}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Centrale delta-pill: toont volume-stijging/daling t.o.v. vorige week.
+// Gebruikt een CSS keyframe-animatie (slide-in van links) om de waarde te
+// laten verschijnen zodra beide datasets geladen zijn.
+function DeltaPill({ pct }) {
+  const isUp = pct > 0
+  const isFlat = pct === 0
+  const color = isFlat
+    ? 'text-[var(--color-text-tertiary)] bg-[var(--color-bg)]'
+    : isUp
+      ? 'text-[var(--color-status-ok)] bg-[var(--color-status-ok)]/10'
+      : 'text-[var(--color-status-high)] bg-[var(--color-status-high)]/10'
+
+  const arrow = isFlat ? '→' : isUp ? '↑' : '↓'
+
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-[var(--font-mono)] text-[10px] font-medium border border-current/20 ${color}`}
+      style={{ animation: 'fadeIn 0.4s ease-out' }}
+    >
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }`}</style>
+      {arrow} {Math.abs(pct)}%
+    </span>
+  )
+}
+
 function UploadCard({ onUploaded, onTokenExpired }) {
   const fileInputRef = useRef(null)
-  const [status, setStatus] = useState('idle') // idle | parsing | uploading | done | error
+  const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
 
@@ -328,9 +461,6 @@ function PlateauSignal({ plateaus, onNavigate }) {
   )
 }
 
-// Toont per oefening een kleine sparkline (e1RM over de laatste sessies --
-// dus gewicht ÉN reps samen, niet alleen top-gewicht) + RPE-trend, zodat in
-// één oogopslag duidelijk is *waarom* het een plateau is.
 function PlateauRow({ plateau }) {
   const e1rms = plateau.sessions.map((s) => s.e1rm)
   const rpes = plateau.sessions.map((s) => s.avgRpe)
@@ -395,8 +525,6 @@ function WeightSparkline({ weights }) {
   )
 }
 
-// Compacte hero: status van vandaag + link naar volgende sessie, geen
-// grote koppen meer. Eén regel hoog qua hiërarchie, niet een dominant blok.
 function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate }) {
   if (nextPlanned === undefined) {
     return (
@@ -462,7 +590,7 @@ function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate })
         </h2>
       </div>
       <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] tabular-data flex-shrink-0">
-        {nextPlanned.planned_date}
+        {formatDate(nextPlanned.planned_date)}
       </p>
     </button>
   )
@@ -518,47 +646,5 @@ function DayStrip({ days, onNavigate }) {
         )
       })}
     </div>
-  )
-}
-
-// Eén kaart-component voor zowel "deze week" als "vorige week" -- exact
-// dezelfde drie metrics (sets, kg, gem. RPE), zodat ze direct vergelijkbaar
-// naast elkaar staan. `highlight` geeft de huidige week een accentrand.
-function WeekVolumeCard({ label, weekVolume, onNavigate, highlight = false }) {
-  return (
-    <button
-      onClick={() => onNavigate('volume')}
-      className={`surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all flex flex-col justify-center ${
-        highlight ? 'border-l-2 border-[var(--color-accent)]' : ''
-      }`}
-    >
-      <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-xs mb-plate-2">
-        {label}
-      </p>
-      {!weekVolume ? (
-        <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
-      ) : (
-        <div className="flex items-end gap-plate-3">
-          <div>
-            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-text-primary)] tabular-data tracking-tight leading-none">
-              {weekVolume.setCount}
-            </p>
-            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">sets</p>
-          </div>
-          <div>
-            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-accent)] tabular-data tracking-tight leading-none">
-              {formatKg(weekVolume.volumeKg)}
-            </p>
-            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">kg</p>
-          </div>
-          <div>
-            <p className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-data)] tabular-data tracking-tight leading-none">
-              {weekVolume.avgRpe ?? '—'}
-            </p>
-            <p className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide mt-0.5">RPE</p>
-          </div>
-        </div>
-      )}
-    </button>
   )
 }

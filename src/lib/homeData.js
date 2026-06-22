@@ -7,18 +7,23 @@
 // BELANGRIJK: "deze week" is hier altijd de volledige kalenderweek
 // (maandag t/m zondag), niet "maandag t/m vandaag". Dat is dezelfde
 // week-definitie als VolumeDashboard.jsx/dashboardQueries.js
-// (getWeekStart) en imbalanceData.js -- eerder telde fetchWeekVolume hier
-// alleen t/m vandaag, waardoor het cijfer op Home structureel lager was
-// dan in de Volume-tab voor dezelfde week. Door consistent de hele
-// kalenderweek te tellen kunnen de schermen niet meer uit elkaar lopen.
+// (getWeekStart) en imbalanceData.js.
+//
+// BUG FIX (2026-06-23): addDays gebruikte new Date(str + 'T00:00:00') +
+// toISOString(). In een browser in CEST (UTC+2) wordt 'T00:00:00' als
+// lokale tijd geïnterpreteerd, maar toISOString() geeft UTC terug — dus
+// midnight CEST = 22:00 UTC vorige dag → slice(0,10) geeft één dag te vroeg.
+// Fix: gebruik 'T00:00:00Z' (expliciete UTC) + setUTCDate/getUTCDate zodat
+// de rekensom puur in UTC plaatsvindt en nooit afhankelijk is van de
+// tijdzone van de browser.
 
 import { supabase } from './supabase'
 import { getTodayStr } from './calendarData'
 import { getWeekStart } from './dashboardQueries'
 
 function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
+  const d = new Date(dateStr + 'T00:00:00Z')  // expliciete UTC: geen browser-timezone drift
+  d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
 
@@ -121,8 +126,7 @@ async function fetchVolumeForWeek(weekStartDate) {
 }
 
 /**
- * Volledige huidige kalenderweek (maandag t/m zondag), inclusief dagen die
- * nog moeten komen -- consistent met de Volume-tab, niet "tot nu".
+ * Volledige huidige kalenderweek (maandag t/m zondag).
  */
 export async function fetchWeekVolume() {
   const currentWeekStart = getWeekStart(getTodayStr())
