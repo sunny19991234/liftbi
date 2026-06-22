@@ -21,8 +21,8 @@ import { supabase } from './supabase'
 import { getTodayStr } from './calendarData'
 import { getWeekStart } from './dashboardQueries'
 
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00Z')  // expliciete UTC: geen browser-timezone drift
+export function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }

@@ -1,24 +1,41 @@
 // src/components/Home.jsx
 //
-// Startpagina: compacte hero met eerstvolgende geplande sessie naast het
-// weekvolume-blok (sets/kg/gem.RPE, volledige kalenderweek), een
-// gecombineerde week-vs-week kaart, een proactief plateau-signaal
-// (PRD 4.12, op basis van e1RM zodat reps-progressie niet als stagnatie
-// wordt gezien), een disbalans-signaal (PRD 4.7, alleen afwijkingen,
-// exact dezelfde week-aggregatie als de Volume-tab), de top 5 grootste
-// PR's, een dagstrip, en een compacte upload-kaart.
+// Herontworpen startpagina (v2):
+//
+// BLOKKEN (volgorde):
+// 1. Readiness hero   — score + volgende sessie + contextregels (deterministisch)
+// 2. Streak + heatmap — consistentie over 10 weken
+// 3. Coach-advies     — per oefening: gewicht/reps omhoog/handhaven (deterministisch)
+// 4. Week vs beste    — huidige week vs all-time beste week (volume + sets)
+// 5. Proactieve signalen — plateau, disbalans, nieuwe PRs samengevoegd
+// 6. Dagstrip         — ±3 dagen context
+// 7. Upload (klein)   — utility, onderaan, niet prominent
 
 import { useEffect, useRef, useState } from 'react'
-import { fetchNextPlanned, fetchDayStrip, fetchWeekVolume, fetchPreviousWeekVolume } from '../lib/homeData'
+import {
+  fetchNextPlanned,
+  fetchDayStrip,
+  fetchWeekVolume,
+  fetchPreviousWeekVolume,
+} from '../lib/homeData'
 import { getTodayStr } from '../lib/calendarData'
 import { detectPlateaus } from '../lib/plateauData'
 import { detectImbalances } from '../lib/imbalanceData'
 import { calculateAllPRs } from '../lib/prData'
+import {
+  fetchCoachAdviceForType,
+  calculateReadinessScore,
+  calculateStreak,
+  fetchBestWeekComparison,
+} from '../lib/coachAdvice'
 import { parseHevyCsv } from '../lib/hevyParser'
 import { getToken, clearToken } from '../lib/auth'
 
 const WEEKDAY_SHORT = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+
+// Workout-types in volgorde van de split — voor coach-advies ophalen
+const SPLIT_TITLES = ['Push', 'Pull', 'Legs', 'Upper']
 
 function formatKg(value) {
   return value.toLocaleString('nl-NL')
@@ -30,19 +47,57 @@ function formatDate(dateStr) {
   return `${day}-${month}-${year}`
 }
 
+// ─── Kleur-helpers ────────────────────────────────────────────────────────────
+
+function readinessColor(score) {
+  if (score >= 8) return 'var(--color-status-ok)'
+  if (score >= 6) return '#3E7CB1'
+  if (score >= 4) return 'var(--color-status-low)'
+  return 'var(--color-status-high)'
+}
+
+function actionColor(action) {
+  switch (action) {
+    case 'gewicht_omhoog': return 'var(--color-status-ok)'
+    case 'reps_omhoog':    return '#3E7CB1'
+    case 'handhaven':      return 'var(--color-text-secondary)'
+    case 'consolideren':   return 'var(--color-status-low)'
+    case 'gewicht_omlaag': return 'var(--color-status-high)'
+    default:               return 'var(--color-text-secondary)'
+  }
+}
+
+function actionLabel(action) {
+  switch (action) {
+    case 'gewicht_omhoog': return '↑ gewicht'
+    case 'reps_omhoog':    return '↑ reps'
+    case 'handhaven':      return '= handhaven'
+    case 'consolideren':   return '~ consolideer'
+    case 'gewicht_omlaag': return '↓ gewicht'
+    default:               return '—'
+  }
+}
+
+// ─── Hoofd-component ──────────────────────────────────────────────────────────
+
 export default function Home({ onNavigate, onTokenExpired }) {
-  const [nextPlanned, setNextPlanned] = useState(undefined)
-  const [dayStrip, setDayStrip] = useState(null)
-  const [weekVolume, setWeekVolume] = useState(null)
-  const [prevWeekVolume, setPrevWeekVolume] = useState(null)
-  const [plateaus, setPlateaus] = useState(null)
-  const [imbalances, setImbalances] = useState(null)
-  const [topPRs, setTopPRs] = useState(null)
-  const [error, setError] = useState(null)
+  const [nextPlanned, setNextPlanned]         = useState(undefined)
+  const [dayStrip, setDayStrip]               = useState(null)
+  const [weekVolume, setWeekVolume]           = useState(null)
+  const [prevWeekVolume, setPrevWeekVolume]   = useState(null)
+  const [plateaus, setPlateaus]               = useState(null)
+  const [imbalances, setImbalances]           = useState(null)
+  const [topPRs, setTopPRs]                   = useState(null)
+  const [readiness, setReadiness]             = useState(null)
+  const [streak, setStreak]                   = useState(null)
+  const [coachAdvice, setCoachAdvice]         = useState(null) // { workoutTitle, date, advices }
+  const [bestWeek, setBestWeek]               = useState(null) // { bestWeekVolume, pct }
+  const [error, setError]                     = useState(null)
 
   const today = getTodayStr()
 
   function loadAll() {
+    // Basis-data parallel laden
     Promise.all([
       fetchNextPlanned(),
       fetchDayStrip(),
@@ -51,8 +106,10 @@ export default function Home({ onNavigate, onTokenExpired }) {
       detectPlateaus(),
       detectImbalances(),
       calculateAllPRs(),
+      calculateReadinessScore(),
+      calculateStreak(3),
     ])
-      .then(([next, strip, vol, prevVol, plateauList, imbalanceList, allPRs]) => {
+      .then(([next, strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData]) => {
         setNextPlanned(next)
         setDayStrip(strip)
         setWeekVolume(vol)
@@ -60,8 +117,47 @@ export default function Home({ onNavigate, onTokenExpired }) {
         setPlateaus(plateauList)
         setImbalances(imbalanceList)
         setTopPRs(rankTopPRs(allPRs, 5))
+        setReadiness(readinessData)
+        setStreak(streakData)
+
+        // Beste-week vergelijking hangt af van weekvolume
+        fetchBestWeekComparison(vol.volumeKg)
+          .then(setBestWeek)
+          .catch(() => {}) // niet-kritiek
+
+        // Coach-advies: laad voor de meest recente sessie ongeacht type
+        loadCoachAdvice()
       })
       .catch((err) => setError(err.message))
+  }
+
+  async function loadCoachAdvice() {
+    // Probeer elk split-type totdat we één vinden met data
+    for (const title of SPLIT_TITLES) {
+      try {
+        const advice = await fetchCoachAdviceForType(title)
+        if (advice && advice.advices.length > 0) {
+          // Maar we willen de MEEST RECENTE sessie overall, niet per type.
+          // Dus we halen alle types op en pakken degene met de recentste datum.
+          break
+        }
+      } catch (_) { /* continue */ }
+    }
+
+    // Haal voor alle split-types op en geef de meest recente
+    const results = await Promise.allSettled(
+      SPLIT_TITLES.map((t) => fetchCoachAdviceForType(t))
+    )
+    const valid = results
+      .filter((r) => r.status === 'fulfilled' && r.value)
+      .map((r) => r.value)
+      .filter((v) => v.advices.length > 0)
+
+    if (valid.length === 0) return
+
+    // Meest recente op basis van datum
+    valid.sort((a, b) => b.date.localeCompare(a.date))
+    setCoachAdvice(valid[0])
   }
 
   useEffect(() => {
@@ -69,7 +165,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const todayInfo = dayStrip?.find((d) => d.isToday)?.info
+  const todayInfo    = dayStrip?.find((d) => d.isToday)?.info
   const todayIsRestDay = dayStrip && !todayInfo
 
   if (error) {
@@ -77,33 +173,48 @@ export default function Home({ onNavigate, onTokenExpired }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-plate-4 flex flex-col gap-plate-4">
-      <NextSessionCard
+    <div className="max-w-3xl mx-auto p-plate-4 flex flex-col gap-plate-3">
+
+      {/* 1. Readiness hero */}
+      <ReadinessHero
+        readiness={readiness}
         nextPlanned={nextPlanned}
         todayInfo={todayInfo}
         todayIsRestDay={todayIsRestDay}
+        imbalances={imbalances}
         onNavigate={onNavigate}
       />
 
+      {/* 2. Streak + heatmap */}
+      {streak !== null && (
+        <StreakCard streak={streak} />
+      )}
+
+      {/* 3. Coach-advies */}
+      {coachAdvice && coachAdvice.advices.length > 0 && (
+        <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
+      )}
+
+      {/* 4. Week vs beste week */}
       <WeekComparisonCard
         weekVolume={weekVolume}
         prevWeekVolume={prevWeekVolume}
+        bestWeek={bestWeek}
         onNavigate={onNavigate}
       />
 
-      <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
+      {/* 5. Proactieve signalen */}
+      <ProactiveSignals
+        plateaus={plateaus}
+        imbalances={imbalances}
+        topPRs={topPRs}
+        onNavigate={onNavigate}
+      />
 
-      {plateaus && plateaus.length > 0 && (
-        <PlateauSignal plateaus={plateaus} onNavigate={onNavigate} />
-      )}
-
-      {imbalances && imbalances.length > 0 && (
-        <ImbalanceSignal imbalances={imbalances} onNavigate={onNavigate} />
-      )}
-
+      {/* 6. Dagstrip */}
       <div className="surface rounded-xl p-plate-3">
         <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm mb-plate-2">
-          Recent & aankomend
+          Recent &amp; aankomend
         </p>
         {!dayStrip ? (
           <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
@@ -112,10 +223,566 @@ export default function Home({ onNavigate, onTokenExpired }) {
         )}
       </div>
 
-      <TopPRsCard topPRs={topPRs} onNavigate={onNavigate} />
+      {/* 7. Upload — klein, onderaan */}
+      <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
+
     </div>
   )
 }
+
+// ─── Readiness hero ───────────────────────────────────────────────────────────
+
+function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, imbalances, onNavigate }) {
+  const score  = readiness?.score ?? null
+  const color  = score !== null ? readinessColor(score) : '#9499A1'
+  const radius = 26
+  const circ   = 2 * Math.PI * radius
+  const filled = score !== null ? (score / 10) * circ : 0
+
+  // Context-redenen voor de volgende sessie
+  const reasons = []
+  if (readiness) {
+    if (readiness.daysSinceLast === 1) reasons.push({ dot: 'ok',   text: 'Gisteren getraind — 1 dag rust' })
+    else if (readiness.daysSinceLast === 2) reasons.push({ dot: 'ok', text: '2 dagen rust — goed hersteld' })
+    else if (readiness.daysSinceLast >= 3) reasons.push({ dot: 'info', text: `${readiness.daysSinceLast} dagen rust — klaar` })
+    else if (readiness.daysSinceLast === 0) reasons.push({ dot: 'warn', text: 'Vandaag al getraind' })
+
+    if (readiness.avgRpe <= 7.5) reasons.push({ dot: 'ok',   text: `Gem. RPE vorige sessie ${readiness.avgRpe} — licht` })
+    else if (readiness.avgRpe <= 8.5) reasons.push({ dot: 'info', text: `Gem. RPE vorige sessie ${readiness.avgRpe}` })
+    else reasons.push({ dot: 'warn', text: `Gem. RPE vorige sessie ${readiness.avgRpe} — zwaar` })
+  }
+
+  // Imbalance als context voor volgende sessie
+  if (imbalances && imbalances.length > 0) {
+    const topIm = imbalances[0]
+    if (topIm.status === 'low') {
+      reasons.push({ dot: 'warn', text: `${topIm.muscle_group} onder target (${topIm.setCount}/${topIm.min} sets)` })
+    }
+  }
+
+  const isLoading = score === null && nextPlanned === undefined
+
+  // Bepaal wat te tonen als title
+  let heroTitle = '—'
+  let heroLabel = 'Volgende sessie'
+  if (todayInfo?.type === 'done') {
+    heroTitle = todayInfo.title
+    heroLabel = 'Vandaag voltooid'
+  } else if (nextPlanned) {
+    heroTitle = nextPlanned.title
+    heroLabel = nextPlanned.planned_date === getTodayStr() ? 'Vandaag gepland' : 'Volgende sessie'
+  } else if (todayIsRestDay) {
+    heroTitle = 'Rustdag'
+    heroLabel = 'Vandaag'
+  }
+
+  return (
+    <button
+      onClick={() => onNavigate('agenda')}
+      className="surface-hero text-left rounded-xl w-full hover:brightness-110 transition-all"
+      style={{ overflow: 'hidden' }}
+    >
+      <div className="loaded-bar" style={{ '--load-pct': score !== null ? `${score * 10}%` : '0%' }} />
+      <div className="flex items-center gap-plate-3 p-plate-3">
+        {/* SVG ring */}
+        <div style={{ flexShrink: 0 }}>
+          <svg width="68" height="68" viewBox="0 0 68 68">
+            <circle cx="34" cy="34" r={radius} fill="none" stroke="var(--color-border)" strokeWidth="5" />
+            {score !== null && (
+              <circle
+                cx="34" cy="34" r={radius}
+                fill="none"
+                stroke={color}
+                strokeWidth="5"
+                strokeDasharray={`${circ}`}
+                strokeDashoffset={`${circ - filled}`}
+                strokeLinecap="round"
+                transform="rotate(-90 34 34)"
+                style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+              />
+            )}
+            {isLoading ? (
+              <text x="34" y="39" textAnchor="middle"
+                fontFamily="JetBrains Mono" fontSize="11" fill="var(--color-text-secondary)">
+                …
+              </text>
+            ) : (
+              <>
+                <text x="34" y="31" textAnchor="middle"
+                  fontFamily="Fraunces,serif" fontSize="16" fontWeight="600" fill={color}>
+                  {score}
+                </text>
+                <text x="34" y="44" textAnchor="middle"
+                  fontFamily="JetBrains Mono" fontSize="8"
+                  fill="var(--color-text-secondary)" letterSpacing="0.05em">
+                  READY
+                </text>
+              </>
+            )}
+          </svg>
+        </div>
+
+        {/* Sessie-info */}
+        <div className="flex-1 min-w-0">
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest mb-0.5"
+            style={{ color: todayInfo?.type === 'done' ? 'var(--color-status-ok)' : 'var(--color-data)' }}>
+            {heroLabel}
+          </p>
+          <h2 className="font-[var(--font-display)] font-semibold text-xl tracking-tight leading-tight text-[var(--color-text-primary)] mb-plate-1">
+            {heroTitle}
+          </h2>
+          <div className="flex flex-col gap-0.5">
+            {reasons.slice(0, 3).map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span style={{
+                  width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                  background: r.dot === 'ok' ? 'var(--color-status-ok)'
+                    : r.dot === 'warn' ? 'var(--color-status-low)'
+                    : '#3E7CB1',
+                }} />
+                <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+                  {r.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Datum */}
+        {nextPlanned && nextPlanned.planned_date !== getTodayStr() && (
+          <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data flex-shrink-0 self-start">
+            {formatDate(nextPlanned.planned_date)}
+          </p>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// ─── Streak + heatmap ─────────────────────────────────────────────────────────
+
+function StreakCard({ streak }) {
+  const { weeks, heatmap } = streak
+  // 10 weken × 7 dagen
+  const weeks10 = []
+  for (let w = 0; w < 10; w++) {
+    weeks10.push(heatmap.slice(w * 7, w * 7 + 7))
+  }
+
+  return (
+    <div className="surface rounded-xl p-plate-3">
+      <div className="flex items-center justify-between mb-plate-2">
+        <div>
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-0.5">
+            Consistentie
+          </p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-accent)] leading-none">
+              {weeks}
+            </span>
+            <span className="font-[var(--font-body)] text-xs text-[var(--color-text-secondary)]">
+              {weeks === 1 ? 'week op rij' : 'weken op rij'} ≥3×/week
+            </span>
+          </div>
+        </div>
+        {weeks >= 4 && (
+          <span className="text-xl" title="Streak">🔥</span>
+        )}
+      </div>
+
+      {/* Heatmap grid: 10 kolommen (weken) × 7 rijen (dagen) */}
+      <div className="flex gap-[3px]">
+        {weeks10.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-[3px]">
+            {week.map((day, di) => (
+              <div
+                key={di}
+                title={day.date}
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: 3,
+                  background: day.isToday
+                    ? 'var(--color-accent)'
+                    : day.done
+                    ? 'rgba(34,197,94,0.7)'
+                    : 'var(--color-card)',
+                  boxShadow: day.isToday ? '0 0 0 2px var(--color-bg), 0 0 0 3px var(--color-accent)' : 'none',
+                  flexShrink: 0,
+                }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between mt-plate-1">
+        <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">10 weken geleden</span>
+        <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">vandaag</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Coach-advies ─────────────────────────────────────────────────────────────
+
+function CoachAdviceCard({ advice, onNavigate }) {
+  const { workoutTitle, date, advices } = advice
+
+  // Splits in actionable (omhoog) vs overig
+  const actionable = advices.filter((a) => ['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
+  const rest       = advices.filter((a) => !['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
+
+  return (
+    <div className="surface rounded-xl overflow-hidden">
+      <div className="loaded-bar" style={{ '--load-pct': '100%' }} />
+      <div className="p-plate-3">
+        <div className="flex items-center justify-between mb-plate-2">
+          <div>
+            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-status-ok)] mb-0.5">
+              Coach-advies — volgende {workoutTitle}
+            </p>
+            <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+              Op basis van {workoutTitle} van {formatDate(date)}
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('rpe')}
+            className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] hover:text-[var(--color-text-primary)]"
+          >
+            RPE-trend →
+          </button>
+        </div>
+
+        {/* Actionable eerst */}
+        {actionable.length > 0 && (
+          <div className="mb-plate-2">
+            <p className="font-[var(--font-body)] text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wide mb-1">
+              Klaar voor progressie
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {actionable.map((a) => (
+                <AdviceRow key={a.exercise_title} advice={a} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Rest inklapbaar als er veel zijn */}
+        {rest.length > 0 && (
+          <div>
+            {actionable.length > 0 && (
+              <p className="font-[var(--font-body)] text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wide mb-1 mt-plate-2">
+                Overige oefeningen
+              </p>
+            )}
+            <div className="flex flex-col gap-1.5">
+              {rest.map((a) => (
+                <AdviceRow key={a.exercise_title} advice={a} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AdviceRow({ advice }) {
+  const color = actionColor(advice.action)
+  const label = actionLabel(advice.action)
+  const { bestSet, repRange } = advice
+
+  return (
+    <div className="flex items-start justify-between gap-plate-2 py-1 border-b border-[var(--color-bg)] last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span
+            className="font-[var(--font-mono)] text-[10px] px-1.5 py-0.5 rounded"
+            style={{ background: `${color}18`, color }}
+          >
+            {label}
+          </span>
+          <span className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] truncate">
+            {advice.exercise_title}
+          </span>
+        </div>
+        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+          {advice.advice}
+        </p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data">
+          {bestSet.weight_kg} kg × {bestSet.reps}
+        </p>
+        {bestSet.rpe && (
+          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+            RPE {bestSet.rpe}
+          </p>
+        )}
+        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] opacity-50">
+          range {repRange.min}–{repRange.max}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Week vs beste week ───────────────────────────────────────────────────────
+
+function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }) {
+  const loaded = weekVolume !== null
+
+  function delta(current, previous) {
+    if (!previous || previous === 0) return null
+    return Math.round(((current - previous) / previous) * 100)
+  }
+
+  const volDelta = loaded && prevWeekVolume ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg) : null
+  const setDelta = loaded && prevWeekVolume ? delta(weekVolume.setCount, prevWeekVolume.setCount) : null
+
+  return (
+    <button
+      onClick={() => onNavigate('volume')}
+      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all w-full"
+    >
+      <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
+        Week-statistieken
+      </p>
+
+      <div className="grid grid-cols-3 gap-0 items-center">
+        {/* Vorige week */}
+        <div style={{ opacity: 0.4 }}>
+          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-tertiary)] mb-1.5 uppercase">Vorige</p>
+          {!prevWeekVolume ? (
+            <p className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">—</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <MiniMetric val={prevWeekVolume.setCount} unit="sets" />
+              <MiniMetric val={formatKg(prevWeekVolume.volumeKg)} unit="kg" />
+              <MiniMetric val={prevWeekVolume.avgRpe ?? '—'} unit="rpe" />
+            </div>
+          )}
+        </div>
+
+        {/* Divider + delta */}
+        <div className="flex flex-col items-center gap-1 px-2">
+          <div style={{ width: 1, background: 'var(--color-border)', height: 24 }} />
+          {volDelta !== null && <DeltaPill pct={volDelta} />}
+          <div style={{ width: 1, background: 'var(--color-border)', height: 12 }} />
+        </div>
+
+        {/* Deze week */}
+        <div>
+          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-accent)] mb-1.5 uppercase">Deze week</p>
+          {!weekVolume ? (
+            <p className="font-[var(--font-mono)] text-sm">Laden...</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <BigMetric val={weekVolume.setCount} unit="sets" delta={setDelta} color="var(--color-text-primary)" />
+              <BigMetric val={formatKg(weekVolume.volumeKg)} unit="kg" color="var(--color-accent)" />
+              <BigMetric val={weekVolume.avgRpe ?? '—'} unit="rpe" color="#3E7CB1" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* vs beste week */}
+      {bestWeek && weekVolume && (
+        <div className="mt-plate-2 pt-plate-2 border-t border-[var(--color-border-subtle)] flex items-center justify-between">
+          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+            vs all-time beste week ({formatKg(bestWeek.bestWeekVolume)} kg)
+          </span>
+          <div className="flex items-center gap-1.5">
+            <div style={{
+              width: 80,
+              height: 4,
+              borderRadius: 2,
+              background: 'var(--color-border)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(bestWeek.pct, 100)}%`,
+                background: bestWeek.pct >= 90 ? 'var(--color-status-ok)'
+                  : bestWeek.pct >= 70 ? 'var(--color-accent)'
+                  : 'var(--color-status-low)',
+                transition: 'width 0.6s ease-out',
+              }} />
+            </div>
+            <span className="font-[var(--font-mono)] text-[10px]"
+              style={{ color: bestWeek.pct >= 90 ? 'var(--color-status-ok)' : 'var(--color-status-low)' }}>
+              {bestWeek.pct}%
+            </span>
+          </div>
+        </div>
+      )}
+    </button>
+  )
+}
+
+function MiniMetric({ val, unit }) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className="font-[var(--font-mono)] text-sm leading-none text-[var(--color-text-primary)]">{val}</span>
+      <span className="font-[var(--font-body)] text-[9px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{unit}</span>
+    </div>
+  )
+}
+
+function BigMetric({ val, unit, delta, color }) {
+  return (
+    <div className="flex items-baseline gap-1">
+      <span className="font-[var(--font-display)] font-semibold text-xl leading-none tabular-data" style={{ color }}>{val}</span>
+      <span className="font-[var(--font-body)] text-[9px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{unit}</span>
+      {delta !== null && delta !== undefined && (
+        <span className="font-[var(--font-mono)] text-[9px] tabular-data"
+          style={{ color: delta > 0 ? 'var(--color-status-ok)' : delta < 0 ? 'var(--color-status-high)' : 'var(--color-text-tertiary)' }}>
+          {delta > 0 ? `+${delta}%` : `${delta}%`}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function DeltaPill({ pct }) {
+  const isUp   = pct > 0
+  const isFlat = pct === 0
+  const colorVar = isFlat ? 'var(--color-text-tertiary)'
+    : isUp ? 'var(--color-status-ok)' : 'var(--color-status-high)'
+  const bg = isFlat ? 'transparent'
+    : isUp ? 'rgba(34,197,94,0.1)' : 'rgba(255,75,62,0.1)'
+  const arrow = isFlat ? '→' : isUp ? '↑' : '↓'
+
+  return (
+    <span className="font-[var(--font-mono)] text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+      style={{ color: colorVar, background: bg, border: `1px solid ${colorVar}20` }}>
+      {arrow} {Math.abs(pct)}%
+    </span>
+  )
+}
+
+// ─── Proactieve signalen (samengevoegd) ───────────────────────────────────────
+
+function ProactiveSignals({ plateaus, imbalances, topPRs, onNavigate }) {
+  const hasData = (plateaus || imbalances || topPRs) !== null
+
+  const recentPRs = topPRs
+    ? topPRs.filter((pr) => pr.oneRepMax?.isRecent)
+    : []
+
+  const signalCount =
+    (plateaus?.length ?? 0) +
+    (imbalances?.length ?? 0) +
+    recentPRs.length
+
+  if (!hasData || signalCount === 0) return null
+
+  return (
+    <div className="surface rounded-xl p-plate-3">
+      <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
+        Signalen
+      </p>
+      <div className="flex flex-col">
+
+        {/* Plateaus */}
+        {plateaus && plateaus.slice(0, 2).map((p) => (
+          <button
+            key={p.exercise_title}
+            onClick={() => onNavigate('rpe')}
+            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
+          >
+            <div className="flex items-center gap-plate-2">
+              <SignalIcon type="warn" icon="trending-down" />
+              <div>
+                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{p.exercise_title}</p>
+                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+                  e1RM {p.sessions.map((s) => `${s.e1rm}kg`).join(' → ')} · RPE {p.rpeTrend}
+                </p>
+              </div>
+            </div>
+            <SignalBadge label="Plateau" color="warn" />
+          </button>
+        ))}
+
+        {/* Imbalances */}
+        {imbalances && imbalances.slice(0, 2).map((im) => (
+          <button
+            key={im.muscle_group}
+            onClick={() => onNavigate('volume')}
+            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
+          >
+            <div className="flex items-center gap-plate-2">
+              <SignalIcon type={im.status === 'low' ? 'danger' : 'warn'} icon="activity" />
+              <div>
+                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] capitalize">{im.muscle_group}</p>
+                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+                  {im.setCount} sets · {im.status === 'low' ? `min ${im.min}` : `max ${im.max}`} sets/week
+                </p>
+              </div>
+            </div>
+            <SignalBadge
+              label={im.status === 'low' ? `−${Math.round(im.min - im.setCount)} sets` : `+${Math.round(im.setCount - im.max)} sets`}
+              color={im.status === 'low' ? 'danger' : 'warn'}
+            />
+          </button>
+        ))}
+
+        {/* Recente PRs */}
+        {recentPRs.slice(0, 2).map((pr) => (
+          <button
+            key={pr.exercise_title}
+            onClick={() => onNavigate('prs')}
+            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
+          >
+            <div className="flex items-center gap-plate-2">
+              <SignalIcon type="ok" icon="trophy" />
+              <div>
+                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{pr.exercise_title}</p>
+                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+                  Geschat 1RM {formatKg(pr.oneRepMax.value)} kg
+                </p>
+              </div>
+            </div>
+            <SignalBadge label="Nieuw PR" color="ok" />
+          </button>
+        ))}
+
+      </div>
+    </div>
+  )
+}
+
+function SignalIcon({ type, icon }) {
+  const bg = type === 'ok' ? 'rgba(34,197,94,0.1)'
+    : type === 'warn' ? 'rgba(217,164,65,0.1)'
+    : 'rgba(255,75,62,0.1)'
+  const color = type === 'ok' ? 'var(--color-status-ok)'
+    : type === 'warn' ? 'var(--color-status-low)'
+    : 'var(--color-status-high)'
+  return (
+    <div style={{
+      width: 30, height: 30, borderRadius: 8, background: bg, color,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <i className={`ti ti-${icon}`} style={{ fontSize: 14 }} aria-hidden="true" />
+    </div>
+  )
+}
+
+function SignalBadge({ label, color }) {
+  const c = color === 'ok' ? 'var(--color-status-ok)'
+    : color === 'warn' ? 'var(--color-status-low)'
+    : 'var(--color-status-high)'
+  return (
+    <span className="font-[var(--font-mono)] text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+      style={{ background: `${c}18`, color: c }}>
+      {label}
+    </span>
+  )
+}
+
+// ─── Top PRs ──────────────────────────────────────────────────────────────────
 
 function rankTopPRs(allPRs, n) {
   return allPRs
@@ -124,483 +791,13 @@ function rankTopPRs(allPRs, n) {
     .slice(0, n)
 }
 
-// Gecombineerde week-vs-week kaart.
-// Layout: vorige week (gedimmd, kleiner) links | scheidingslijn met delta-pijl | deze week (prominent) rechts.
-// De deltawaarden animeren in via CSS-transition op opacity zodra data geladen is.
-function WeekComparisonCard({ weekVolume, prevWeekVolume, onNavigate }) {
-  const loaded = weekVolume !== null && prevWeekVolume !== null
-
-  function delta(current, previous) {
-    if (!previous || previous === 0) return null
-    const pct = Math.round(((current - previous) / previous) * 100)
-    return pct
-  }
-
-  const volDelta = loaded ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg) : null
-  const setDelta = loaded ? delta(weekVolume.setCount, prevWeekVolume.setCount) : null
-
-  return (
-    <button
-      onClick={() => onNavigate('volume')}
-      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all w-full"
-    >
-      <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-xs mb-plate-3 uppercase tracking-wide">
-        Week-vergelijking
-      </p>
-
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-plate-2">
-        {/* Vorige week — gedimmd */}
-        <div className="opacity-40">
-          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-tertiary)] mb-plate-2 uppercase tracking-wide">
-            Vorige week
-          </p>
-          {!prevWeekVolume ? (
-            <p className="text-[var(--color-text-tertiary)] font-[var(--font-mono)] text-sm">—</p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <WeekMetric label="sets" value={prevWeekVolume.setCount} color="text-[var(--color-text-primary)]" size="small" />
-              <WeekMetric label="kg" value={formatKg(prevWeekVolume.volumeKg)} color="text-[var(--color-text-primary)]" size="small" />
-              <WeekMetric label="RPE" value={prevWeekVolume.avgRpe ?? '—'} color="text-[var(--color-text-primary)]" size="small" />
-            </div>
-          )}
-        </div>
-
-        {/* Scheidingslijn + delta */}
-        <div className="flex flex-col items-center gap-2 px-plate-1">
-          <div className="w-px bg-[var(--color-border)] flex-1 min-h-[60px]" />
-          {loaded && volDelta !== null && (
-            <DeltaPill pct={volDelta} />
-          )}
-          <div className="w-px bg-[var(--color-border)] flex-1 min-h-[20px]" />
-        </div>
-
-        {/* Deze week — prominent */}
-        <div>
-          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-accent)] mb-plate-2 uppercase tracking-wide">
-            Deze week
-          </p>
-          {!weekVolume ? (
-            <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <WeekMetric
-                label="sets"
-                value={weekVolume.setCount}
-                color="text-[var(--color-text-primary)]"
-                size="large"
-                subDelta={setDelta}
-              />
-              <WeekMetric
-                label="kg"
-                value={formatKg(weekVolume.volumeKg)}
-                color="text-[var(--color-accent)]"
-                size="large"
-              />
-              <WeekMetric
-                label="RPE"
-                value={weekVolume.avgRpe ?? '—'}
-                color="text-[var(--color-data)]"
-                size="large"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </button>
-  )
-}
-
-function WeekMetric({ label, value, color, size, subDelta }) {
-  const numClass = size === 'large'
-    ? `font-[var(--font-display)] font-semibold text-xl tracking-tight leading-none ${color}`
-    : `font-[var(--font-mono)] text-sm leading-none ${color}`
-
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <span className={`tabular-data ${numClass}`}>{value}</span>
-      <span className="text-[9px] text-[var(--color-text-tertiary)] font-[var(--font-body)] uppercase tracking-wide">
-        {label}
-      </span>
-      {subDelta !== null && subDelta !== undefined && (
-        <span className={`text-[9px] font-[var(--font-mono)] tabular-data ${
-          subDelta > 0 ? 'text-[var(--color-status-ok)]' : subDelta < 0 ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-tertiary)]'
-        }`}>
-          {subDelta > 0 ? `+${subDelta}%` : `${subDelta}%`}
-        </span>
-      )}
-    </div>
-  )
-}
-
-// Centrale delta-pill: toont volume-stijging/daling t.o.v. vorige week.
-// Gebruikt een CSS keyframe-animatie (slide-in van links) om de waarde te
-// laten verschijnen zodra beide datasets geladen zijn.
-function DeltaPill({ pct }) {
-  const isUp = pct > 0
-  const isFlat = pct === 0
-  const color = isFlat
-    ? 'text-[var(--color-text-tertiary)] bg-[var(--color-bg)]'
-    : isUp
-      ? 'text-[var(--color-status-ok)] bg-[var(--color-status-ok)]/10'
-      : 'text-[var(--color-status-high)] bg-[var(--color-status-high)]/10'
-
-  const arrow = isFlat ? '→' : isUp ? '↑' : '↓'
-
-  return (
-    <span
-      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-[var(--font-mono)] text-[10px] font-medium border border-current/20 ${color}`}
-      style={{ animation: 'fadeIn 0.4s ease-out' }}
-    >
-      <style>{`@keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }`}</style>
-      {arrow} {Math.abs(pct)}%
-    </span>
-  )
-}
-
-function UploadCard({ onUploaded, onTokenExpired }) {
-  const fileInputRef = useRef(null)
-  const [status, setStatus] = useState('idle')
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
-
-  async function handleFileChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setError(null)
-    setResult(null)
-    setStatus('parsing')
-
-    let sessions
-    try {
-      const text = await file.text()
-      const parsed = parseHevyCsv(text)
-      sessions = parsed.sessions
-    } catch (err) {
-      setError(`Parsefout: ${err.message}`)
-      setStatus('error')
-      return
-    }
-
-    setStatus('uploading')
-
-    try {
-      const token = getToken()
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-workouts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sessions }),
-      })
-
-      if (res.status === 401) {
-        clearToken()
-        onTokenExpired?.()
-        return
-      }
-
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(`Server gaf status ${res.status}: ${text}`)
-      }
-
-      const data = await res.json()
-      setResult(data)
-      setStatus('done')
-      onUploaded?.()
-    } catch (err) {
-      setError(`Uploadfout: ${err.message}`)
-      setStatus('error')
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  const busy = status === 'parsing' || status === 'uploading'
-
-  return (
-    <div className="surface rounded-xl p-plate-3 flex flex-col gap-plate-2">
-      <div className="flex items-center justify-between gap-plate-3">
-        <div>
-          <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] font-medium">
-            Workouts importeren
-          </p>
-          <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] mt-0.5">
-            {busy
-              ? status === 'parsing' ? 'CSV parsen...' : 'Uploaden...'
-              : 'Hevy CSV-export'}
-          </p>
-        </div>
-        <label className={`px-plate-3 py-plate-2 rounded-lg text-sm font-[var(--font-body)] font-medium flex-shrink-0 transition-opacity ${
-          busy
-            ? 'bg-[var(--color-card-raised)] text-[var(--color-text-secondary)] cursor-wait'
-            : 'bg-[var(--color-accent)] text-white cursor-pointer hover:opacity-90'
-        }`}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            disabled={busy}
-            className="hidden"
-          />
-          {busy ? 'Bezig...' : 'Kies bestand'}
-        </label>
-      </div>
-
-      {error && (
-        <p className="text-[var(--color-status-high)] font-[var(--font-body)] text-xs">{error}</p>
-      )}
-
-      {result && (
-        <div className="flex flex-col gap-1 pt-plate-1 border-t border-[var(--color-border-subtle)]">
-          <p className="text-[var(--color-status-ok)] font-[var(--font-mono)] text-xs tabular-data">
-            {result.created} nieuw · {result.updated} bijgewerkt
-          </p>
-          {result.sessionResults.some((s) => s.status === 'error') && (
-            <ul className="font-[var(--font-mono)] text-xs text-[var(--color-status-high)] flex flex-col gap-0.5">
-              {result.sessionResults.filter((s) => s.status === 'error').map((s, i) => (
-                <li key={i}>{s.title}: {s.error}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ImbalanceSignal({ imbalances, onNavigate }) {
-  const visible = imbalances.slice(0, 3)
-  const extra = imbalances.length - visible.length
-
-  return (
-    <button
-      onClick={() => onNavigate('volume')}
-      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all border-l-2 border-[var(--color-data)]"
-    >
-      <p className="text-xs text-[var(--color-data)] font-[var(--font-mono)] tracking-wide uppercase mb-plate-2">
-        {imbalances.length === 1 ? '1 spiergroep buiten target' : `${imbalances.length} spiergroepen buiten target`}
-      </p>
-      <div className="flex flex-col gap-1.5">
-        {visible.map((im) => (
-          <div key={im.muscle_group} className="flex items-center justify-between">
-            <span className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] capitalize">
-              {im.muscle_group}
-            </span>
-            <span className={`font-[var(--font-mono)] text-xs tabular-data ${
-              im.status === 'low' ? 'text-[var(--color-status-low)]' : 'text-[var(--color-status-high)]'
-            }`}>
-              {im.setCount} sets ({im.status === 'low' ? `min ${im.min}` : `max ${im.max}`})
-            </span>
-          </div>
-        ))}
-        {extra > 0 && (
-          <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-tertiary)] mt-1">+{extra} meer</span>
-        )}
-      </div>
-    </button>
-  )
-}
-
-function TopPRsCard({ topPRs, onNavigate }) {
-  return (
-    <button
-      onClick={() => onNavigate('prs')}
-      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all"
-    >
-      <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm mb-plate-3">
-        Zwaarste lifts (geschat 1RM)
-      </p>
-      {!topPRs ? (
-        <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
-      ) : topPRs.length === 0 ? (
-        <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm">Nog geen PR's berekend.</p>
-      ) : (
-        <ol className="flex flex-col gap-1.5">
-          {topPRs.map((pr, i) => (
-            <li key={pr.exercise_title} className="flex items-center justify-between gap-plate-2">
-              <span className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] truncate flex items-center gap-2">
-                <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-tertiary)] w-3 flex-shrink-0">{i + 1}</span>
-                <span className="truncate">{pr.exercise_title}</span>
-              </span>
-              <span className="font-[var(--font-mono)] text-xs text-[var(--color-accent)] tabular-data flex-shrink-0">
-                {formatKg(pr.oneRepMax.value)} kg
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </button>
-  )
-}
-
-function PlateauSignal({ plateaus, onNavigate }) {
-  const visible = plateaus.slice(0, 3)
-  const extra = plateaus.length - visible.length
-
-  return (
-    <button
-      onClick={() => onNavigate('rpe')}
-      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all border-l-2 border-[var(--color-status-low)]"
-    >
-      <p className="text-xs text-[var(--color-status-low)] font-[var(--font-mono)] tracking-wide uppercase mb-plate-3">
-        {plateaus.length === 1 ? '1 oefening stagneert' : `${plateaus.length} oefeningen stagneren`}
-      </p>
-      <div className="flex flex-col gap-plate-3">
-        {visible.map((p) => (
-          <PlateauRow key={p.exercise_title} plateau={p} />
-        ))}
-        {extra > 0 && (
-          <span className="font-[var(--font-mono)] text-xs text-[var(--color-text-tertiary)]">+{extra} meer</span>
-        )}
-      </div>
-    </button>
-  )
-}
-
-function PlateauRow({ plateau }) {
-  const e1rms = plateau.sessions.map((s) => s.e1rm)
-  const rpes = plateau.sessions.map((s) => s.avgRpe)
-
-  return (
-    <div className="flex items-center justify-between gap-plate-3">
-      <div className="min-w-0 flex-1">
-        <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] truncate">
-          {plateau.exercise_title}
-        </p>
-        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] tabular-data mt-0.5">
-          e1RM {e1rms.map((v) => `${v}kg`).join(' → ')}
-          {rpes.every((r) => r !== null) && (
-            <span className="ml-2 text-[var(--color-text-tertiary)]">
-              RPE {rpes.map((r) => r.toFixed(1)).join(' → ')}
-            </span>
-          )}
-        </p>
-      </div>
-      <WeightSparkline weights={e1rms} />
-    </div>
-  )
-}
-
-function WeightSparkline({ weights }) {
-  const w = 56
-  const h = 24
-  const pad = 3
-  const min = Math.min(...weights)
-  const max = Math.max(...weights)
-  const range = max - min || 1
-
-  const points = weights.map((val, i) => {
-    const x = pad + (i / (weights.length - 1 || 1)) * (w - pad * 2)
-    const y = h - pad - ((val - min) / range) * (h - pad * 2)
-    return [x, y]
-  })
-
-  const path = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  const flat = max === min
-
-  return (
-    <svg width={w} height={h} className="flex-shrink-0" viewBox={`0 0 ${w} ${h}`}>
-      <path
-        d={path}
-        fill="none"
-        stroke={flat ? '#D9A441' : '#9499A1'}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {points.map(([x, y], i) => (
-        <circle
-          key={i}
-          cx={x}
-          cy={y}
-          r={i === points.length - 1 ? 2.5 : 1.5}
-          fill={i === points.length - 1 ? '#D9A441' : '#9499A1'}
-        />
-      ))}
-    </svg>
-  )
-}
-
-function NextSessionCard({ nextPlanned, todayInfo, todayIsRestDay, onNavigate }) {
-  if (nextPlanned === undefined) {
-    return (
-      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center">
-        <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
-      </div>
-    )
-  }
-
-  if (todayInfo?.type === 'done') {
-    return (
-      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] text-[var(--color-status-ok)] font-[var(--font-mono)] tracking-wide uppercase">
-            Vandaag voltooid
-          </p>
-          <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight">
-            {todayInfo.title}
-          </h2>
-        </div>
-      </div>
-    )
-  }
-
-  if (todayIsRestDay && !nextPlanned) {
-    return (
-      <div className="surface-hero rounded-xl px-plate-3 py-plate-2 flex items-center justify-between">
-        <div>
-          <p className="text-[10px] text-[var(--color-text-tertiary)] font-[var(--font-mono)] tracking-wide uppercase">
-            Vandaag
-          </p>
-          <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight">
-            Rustdag
-          </h2>
-        </div>
-      </div>
-    )
-  }
-
-  if (!nextPlanned) {
-    return (
-      <div className="surface rounded-xl px-plate-3 py-plate-2 flex items-center">
-        <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-body)]">
-          Geen geplande sessies. Plan er een in de Agenda.
-        </p>
-      </div>
-    )
-  }
-
-  const isToday = nextPlanned.planned_date === getTodayStr()
-
-  return (
-    <button
-      onClick={() => onNavigate('agenda')}
-      className="surface-hero text-left rounded-xl px-plate-3 py-plate-2 w-full hover:brightness-110 transition-all group flex items-center justify-between"
-    >
-      <div>
-        <p className="text-[10px] text-[var(--color-data)] font-[var(--font-mono)] tracking-wide uppercase">
-          {isToday ? 'Vandaag gepland' : 'Volgende sessie'}
-        </p>
-        <h2 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)] tracking-tight leading-tight group-hover:text-white transition-colors">
-          {nextPlanned.title}
-        </h2>
-      </div>
-      <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] tabular-data flex-shrink-0">
-        {formatDate(nextPlanned.planned_date)}
-      </p>
-    </button>
-  )
-}
+// ─── Dagstrip ─────────────────────────────────────────────────────────────────
 
 function DayStrip({ days, onNavigate }) {
   return (
     <div className="grid grid-cols-7 gap-plate-1">
       {days.map((d) => {
-        const dayNum = Number(d.date.slice(8, 10))
+        const dayNum  = Number(d.date.slice(8, 10))
         const weekday = WEEKDAY_SHORT[new Date(d.date + 'T00:00:00').getDay()]
 
         let bg = 'bg-[var(--color-bg)]'
@@ -645,6 +842,94 @@ function DayStrip({ days, onNavigate }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ─── Upload (klein, onderaan) ─────────────────────────────────────────────────
+
+function UploadCard({ onUploaded, onTokenExpired }) {
+  const fileInputRef = useRef(null)
+  const [status, setStatus]   = useState('idle')
+  const [error, setError]     = useState(null)
+  const [result, setResult]   = useState(null)
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setError(null)
+    setResult(null)
+    setStatus('parsing')
+
+    let sessions
+    try {
+      const text = await file.text()
+      sessions = parseHevyCsv(text).sessions
+    } catch (err) {
+      setError(`Parsefout: ${err.message}`)
+      setStatus('error')
+      return
+    }
+
+    setStatus('uploading')
+    try {
+      const token = getToken()
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-workouts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessions }),
+      })
+
+      if (res.status === 401) { clearToken(); onTokenExpired?.(); return }
+      if (!res.ok) throw new Error(`Server ${res.status}: ${await res.text()}`)
+
+      const data = await res.json()
+      setResult(data)
+      setStatus('done')
+      onUploaded?.()
+    } catch (err) {
+      setError(`Uploadfout: ${err.message}`)
+      setStatus('error')
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const busy = status === 'parsing' || status === 'uploading'
+
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Kleine neutrale knop */}
+      <div className="flex items-center gap-plate-2">
+        <label className={`flex items-center gap-1.5 px-plate-2 py-1 rounded-lg text-xs font-[var(--font-body)] border border-[var(--color-border-subtle)] cursor-pointer transition-colors ${
+          busy
+            ? 'text-[var(--color-text-secondary)] cursor-wait'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border)]'
+        }`}>
+          <i className="ti ti-upload" style={{ fontSize: 13 }} aria-hidden="true" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            disabled={busy}
+            className="hidden"
+          />
+          {busy
+            ? status === 'parsing' ? 'Parsen...' : 'Uploaden...'
+            : 'Hevy CSV importeren'}
+        </label>
+
+        {result && !error && (
+          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-status-ok)]">
+            {result.created} nieuw · {result.updated} bijgewerkt
+          </span>
+        )}
+        {error && (
+          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-status-high)]">{error}</span>
+        )}
+      </div>
     </div>
   )
 }

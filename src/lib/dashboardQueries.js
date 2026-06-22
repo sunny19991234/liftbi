@@ -79,11 +79,16 @@ export async function fetchVolumeTargets() {
 /**
  * Geeft de maandag (ISO-weekstart) van een gegeven datum terug, als
  * YYYY-MM-DD string.
+ *
+ * BELANGRIJK: gebruikt expliciete UTC-rekenkunde (T00:00:00Z + setUTCDate)
+ * om browser-timezone drift te voorkomen. Zonder 'Z' wordt midnight lokale
+ * tijd geïnterpreteerd als UTC-2 (CEST), waarna toISOString().slice(0,10)
+ * één dag te vroeg teruggeeft. Zie ook homeData.js addDays().
  */
 export function getWeekStart(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  const day = d.getDay() // 0 = zondag
+  const d = new Date(dateStr + 'T00:00:00Z')  // expliciete UTC
+  const day = d.getUTCDay() // 0 = zondag
   const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
+  d.setUTCDate(d.getUTCDate() + diff)
   return d.toISOString().slice(0, 10)
 }
