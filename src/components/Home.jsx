@@ -145,19 +145,20 @@ export default function Home({ onNavigate, onTokenExpired }) {
   }
 
   async function loadCoachAdvice(nextWorkout) {
-    // Prioriteit: volgende geplande workout type
     const priorityTitle = nextWorkout?.title
+
     if (priorityTitle) {
+      // Altijd gebaseerd op de eerst komende geplande workout — nooit terugvallen op ander type
       try {
         const advice = await fetchCoachAdviceForType(priorityTitle)
         if (advice && advice.advices.length > 0) {
           setCoachAdvice(advice)
-          return
         }
-      } catch (_) { /* fall through */ }
+      } catch (_) { /* geen advies beschikbaar voor dit type */ }
+      return
     }
 
-    // Fallback: meest recente sessie overall
+    // Geen geplande workout: meest recente sessie overall als fallback
     const results = await Promise.allSettled(
       SPLIT_TITLES.map((t) => fetchCoachAdviceForType(t))
     )

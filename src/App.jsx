@@ -4,33 +4,25 @@ import Login from './components/Login'
 import Home from './components/Home'
 import VolumeDashboard from './components/VolumeDashboard'
 import ExerciseLibrary from './components/ExerciseLibrary'
-import Agenda from './components/Agenda'
-import Sessions from './components/Sessions'
 import MonthlyComparison from './components/MonthlyComparison'
 import PersonalRecords from './components/PersonalRecords'
+import Workouts from './components/Workouts'
 
 const TABS = [
-  { id: 'home', label: 'Home' },
-  { id: 'volume', label: 'Statistics' },
-  { id: 'oefeningen', label: 'Oefeningen' },
-  { id: 'maand', label: 'Maandvergelijking', hidden: true },
-  { id: 'prs', label: "PR's", hidden: true },
-  { id: 'agenda', label: 'Agenda' },
-  { id: 'sessions', label: 'Sessies' },
+  { id: 'home',      label: 'Home'             },
+  { id: 'volume',    label: 'Statistics'        },
+  { id: 'oefeningen',label: 'Oefeningen'        },
+  { id: 'maand',     label: 'Maandvergelijking', hidden: true },
+  { id: 'prs',       label: "PR's",             hidden: true },
+  { id: 'workouts',  label: 'Workouts'          },
 ]
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const [tab, setTab] = useState('home')
-  const [pendingSessionId, setPendingSessionId] = useState(null)
 
   if (!loggedIn) {
     return <Login onLoginSuccess={() => setLoggedIn(true)} />
-  }
-
-  function goToSession(workoutId) {
-    setPendingSessionId(workoutId)
-    setTab('sessions')
   }
 
   return (
@@ -59,18 +51,12 @@ function App() {
         <div className="loaded-bar rounded-full" style={{ '--load-pct': '100%' }} />
       </header>
 
-      {tab === 'home' && <Home onNavigate={setTab} onTokenExpired={() => setLoggedIn(false)} />}
-      {tab === 'volume' && <VolumeDashboard />}
+      {tab === 'home'       && <Home onNavigate={setTab} onTokenExpired={() => setLoggedIn(false)} />}
+      {tab === 'volume'     && <VolumeDashboard />}
       {tab === 'oefeningen' && <ExerciseLibrary />}
-      {tab === 'maand' && <MonthlyComparison />}
-      {tab === 'prs' && <PersonalRecords />}
-      {tab === 'agenda' && <Agenda onViewSession={goToSession} />}
-      {tab === 'sessions' && (
-        <Sessions
-          initialSelectedId={pendingSessionId}
-          onSelectionHandled={() => setPendingSessionId(null)}
-        />
-      )}
+      {tab === 'maand'      && <MonthlyComparison />}
+      {tab === 'prs'        && <PersonalRecords />}
+      {tab === 'workouts'   && <Workouts />}
     </div>
   )
 }

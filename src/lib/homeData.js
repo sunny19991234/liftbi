@@ -33,17 +33,31 @@ export function addDays(dateStr, n) {
  */
 export async function fetchNextPlanned() {
   const today = getTodayStr()
-  const { data, error } = await supabase
+
+  // Haal de eerstvolgende geplande sessies op (meer dan 1 zodat we gedane datums kunnen overslaan)
+  const { data: planned, error: pErr } = await supabase
     .from('planned_workouts')
     .select('id, planned_date, title, notes')
     .eq('status', 'planned')
     .gte('planned_date', today)
     .order('planned_date', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(10)
 
-  if (error) throw error
-  return data
+  if (pErr) throw pErr
+  if (!planned || planned.length === 0) return null
+
+  // Haal de datums op waarop al een workout gedaan is (binnen de geplande periode)
+  const dates = planned.map((p) => p.planned_date)
+  const { data: done, error: dErr } = await supabase
+    .from('workouts')
+    .select('start_date')
+    .in('start_date', dates)
+
+  if (dErr) throw dErr
+  const doneDates = new Set((done ?? []).map((w) => w.start_date))
+
+  // Eerste geplande sessie waarop nog geen workout gedaan is
+  return planned.find((p) => !doneDates.has(p.planned_date)) ?? null
 }
 
 /**
