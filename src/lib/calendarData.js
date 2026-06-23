@@ -39,19 +39,23 @@ export async function fetchMonthData(year, month) {
   if (workoutIds.length > 0) {
     const { data: sets, error: sErr } = await supabase
       .from('sets')
-      .select('workout_id, weight_kg, reps')
+      .select('workout_id, weight_kg, reps, rpe')
       .in('workout_id', workoutIds)
     if (sErr) throw sErr
 
     setsByWorkout = new Map()
     for (const s of sets) {
       if (!setsByWorkout.has(s.workout_id)) {
-        setsByWorkout.set(s.workout_id, { setCount: 0, volumeKg: 0 })
+        setsByWorkout.set(s.workout_id, { setCount: 0, volumeKg: 0, rpeSum: 0, rpeCount: 0 })
       }
       const entry = setsByWorkout.get(s.workout_id)
       entry.setCount += 1
       if (s.weight_kg != null && s.reps != null) {
         entry.volumeKg += s.weight_kg * s.reps
+      }
+      if (s.rpe != null) {
+        entry.rpeSum += s.rpe
+        entry.rpeCount += 1
       }
     }
 
@@ -70,13 +74,15 @@ export async function fetchMonthData(year, month) {
   const dayMap = new Map()
 
   for (const w of workouts) {
-    const stats = setsByWorkout.get(w.id) ?? { setCount: 0, volumeKg: 0 }
+    const stats = setsByWorkout.get(w.id) ?? { setCount: 0, volumeKg: 0, rpeSum: 0, rpeCount: 0 }
+    const avgRpe = stats.rpeCount > 0 ? Math.round((stats.rpeSum / stats.rpeCount) * 10) / 10 : null
     dayMap.set(w.start_date, {
       type: 'done',
       workoutId: w.id,
       title: w.title,
       setCount: stats.setCount,
       volumeKg: Math.round(stats.volumeKg),
+      avgRpe,
       summary: summaryByWorkout.get(w.id) ?? null,
     })
   }

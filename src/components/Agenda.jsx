@@ -221,6 +221,18 @@ function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }
             <span className="text-[9px] leading-tight font-[var(--font-mono)] text-[var(--color-text-secondary)] tabular-data">
               {info.volumeKg} kg
             </span>
+            {info.avgRpe != null && (
+              <span
+                className="text-[9px] leading-tight font-[var(--font-mono)] tabular-data"
+                style={{
+                  color: info.avgRpe >= 9 ? 'var(--color-status-high)'
+                    : info.avgRpe >= 8 ? 'var(--color-status-low)'
+                    : '#3E7CB1',
+                }}
+              >
+                RPE {info.avgRpe}
+              </span>
+            )}
           </div>
         )}
 
@@ -287,7 +299,7 @@ function AnalysisPreview({ info, onClose, onViewFull }) {
             {info.title}
           </h3>
           <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data">
-            {info.date} · {info.setCount} sets · {info.volumeKg} kg
+            {info.date} · {info.setCount} sets · {info.volumeKg} kg{info.avgRpe != null ? ` · RPE ${info.avgRpe}` : ''}
           </p>
         </div>
 

@@ -35,7 +35,7 @@ Data: Hevy CSV-export. Kolommen: title, start_time, end_time, exercise_title, se
 
 Opdracht:
 1. De meest recente sessie in de data is "vandaag". Vergelijk met de voorgaande sessie(s) van hetzelfde type (zelfde title).
-2. Per oefening: beoordeel per set of de progressie (gewicht × reps × RPE) t.o.v. vorige keer een vooruitgang, stagnatie of achteruitgang is. Benoem concreet wat goed ging en wat niet (te snel naar RPE 9-10, geen warm-up gedaan, reps buiten hypertrofie-range 6-12, etc.).
+2. Per oefening: beoordeel per set of de progressie (gewicht × reps × RPE) t.o.v. vorige keer een vooruitgang, stagnatie of achteruitgang is. Benoem concreet wat goed ging en wat niet (te snel naar RPE 9-10, geen warm-up gedaan, reps buiten de doelrange: 6-10 voor compound oefeningen, 8-12 voor isolatie-oefeningen, etc.).
 3. Geef een cijfer (1-10) op: progressive overload, RPE-management, warm-up consistentie, volume per spiergroep, oefenkeuze/mix.
 4. Helicopter view over de beschikbare weken in de data: sets per spiergroep per week, disbalans (structureel te veel/te weinig), trainingsfrequentie toereikend voor herstel + groei.
 5. Top 3 concrete aanbevelingen voor de volgende sessie van dit type.

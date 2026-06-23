@@ -3,22 +3,20 @@ import { isLoggedIn } from './lib/auth'
 import Login from './components/Login'
 import Home from './components/Home'
 import VolumeDashboard from './components/VolumeDashboard'
-import RpeTrend from './components/RpeTrend'
+import ExerciseLibrary from './components/ExerciseLibrary'
 import Agenda from './components/Agenda'
 import Sessions from './components/Sessions'
-import MuscleGroupMapping from './components/MuscleGroupMapping'
 import MonthlyComparison from './components/MonthlyComparison'
 import PersonalRecords from './components/PersonalRecords'
 
 const TABS = [
   { id: 'home', label: 'Home' },
-  { id: 'volume', label: 'Volume' },
-  { id: 'rpe', label: 'RPE-trend' },
-  { id: 'maand', label: 'Maandvergelijking' },
-  { id: 'prs', label: "PR's" },
+  { id: 'volume', label: 'Statistics' },
+  { id: 'oefeningen', label: 'Oefeningen' },
+  { id: 'maand', label: 'Maandvergelijking', hidden: true },
+  { id: 'prs', label: "PR's", hidden: true },
   { id: 'agenda', label: 'Agenda' },
   { id: 'sessions', label: 'Sessies' },
-  { id: 'mapping', label: 'Oefeningen' },
 ]
 
 function App() {
@@ -43,7 +41,7 @@ function App() {
             Lift<span className="text-[var(--color-accent)]">BI</span>
           </h1>
           <nav className="flex gap-plate-1 flex-wrap">
-            {TABS.map((t) => (
+            {TABS.filter((t) => !t.hidden).map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
@@ -63,7 +61,7 @@ function App() {
 
       {tab === 'home' && <Home onNavigate={setTab} onTokenExpired={() => setLoggedIn(false)} />}
       {tab === 'volume' && <VolumeDashboard />}
-      {tab === 'rpe' && <RpeTrend />}
+      {tab === 'oefeningen' && <ExerciseLibrary />}
       {tab === 'maand' && <MonthlyComparison />}
       {tab === 'prs' && <PersonalRecords />}
       {tab === 'agenda' && <Agenda onViewSession={goToSession} />}
@@ -73,7 +71,6 @@ function App() {
           onSelectionHandled={() => setPendingSessionId(null)}
         />
       )}
-      {tab === 'mapping' && <MuscleGroupMapping />}
     </div>
   )
 }

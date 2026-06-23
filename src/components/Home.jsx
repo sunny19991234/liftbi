@@ -48,6 +48,13 @@ function formatDate(dateStr) {
   return `${day}-${month}-${year}`
 }
 
+function formatDateHuman(dateStr) {
+  if (!dateStr) return ''
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+  const [, month, day] = dateStr.split('-')
+  return `${parseInt(day)} ${months[parseInt(month) - 1]}`
+}
+
 // ─── Kleur-helpers ────────────────────────────────────────────────────────────
 
 function readinessColor(score) {
@@ -359,12 +366,28 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
         </div>
       </div>
 
+      {/* "→ Bekijk agenda" footer */}
+      <div className="px-plate-3 pb-2 pt-1 flex justify-end">
+        <span className="font-[var(--font-mono)] text-[9px]" style={{ color: 'var(--color-data)' }}>
+          → Bekijk agenda
+        </span>
+      </div>
+
       {/* Mesocyclus strip — tijdlijn met pijltjes */}
       {mesoItems.length > 0 && (
         <div className="border-t border-[var(--color-border-subtle)] px-plate-3 py-2.5">
           <div className="flex items-center justify-between mb-2">
-            <span className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)]">
-              Mesocyclus — Week {mesoWeek}
+            <span
+              className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em]"
+              style={{
+                color: 'var(--color-accent)',
+                background: 'var(--color-accent)14',
+                border: '1px solid var(--color-accent)28',
+                borderRadius: 3,
+                padding: '2px 6px',
+              }}
+            >
+              Week {mesoWeek}
             </span>
           </div>
           <div className="flex items-end overflow-x-auto gap-0" style={{ scrollbarWidth: 'none' }}>
@@ -442,7 +465,7 @@ function StreakCard({ streak }) {
   return (
     <div className="surface rounded-xl px-3 py-2 relative" style={{ position: 'relative' }}>
       {weeks >= 4 && (
-        <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }} title="Streak">🔥</span>
+        <i className="ti ti-flame" style={{ position: 'absolute', top: 8, right: 10, fontSize: 14, color: 'var(--color-status-low)' }} aria-hidden="true" />
       )}
       <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-1.5">
         Consistentie
@@ -488,27 +511,56 @@ function StreakCard({ streak }) {
 
 // ─── Coach-advies ─────────────────────────────────────────────────────────────
 
+function groupAdvices(list) {
+  const grouped = []
+  const seen = new Map()
+  for (const a of list) {
+    const key = `${a.action}::${a.advice}`
+    if (seen.has(key)) {
+      seen.get(key).exercises.push(a.exercise_title)
+    } else {
+      const entry = { ...a, exercises: [a.exercise_title] }
+      seen.set(key, entry)
+      grouped.push(entry)
+    }
+  }
+  return grouped
+}
+
 function CoachAdviceCard({ advice, onNavigate }) {
+  const [expanded, setExpanded] = useState(false)
   const { workoutTitle, date, advices } = advice
-  const actionable = advices.filter((a) => ['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
-  const rest       = advices.filter((a) => !['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
-  const allAdvices = [...actionable, ...rest]
+
+  const actionable = groupAdvices(advices.filter((a) => ['gewicht_omhoog', 'reps_omhoog'].includes(a.action)))
+  const maintain   = groupAdvices(advices.filter((a) => !['gewicht_omhoog', 'reps_omhoog'].includes(a.action)))
+  const allGrouped = [...actionable, ...maintain]
+
+  const VISIBLE_MAX = 3
+  const hasMore = allGrouped.length > VISIBLE_MAX
+  const visible = expanded ? allGrouped : allGrouped.slice(0, VISIBLE_MAX)
 
   return (
     <div className="surface rounded-xl overflow-hidden" style={{ position: 'relative' }}>
-      {/* Icon rechtsboven */}
       <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 10 }}>
         <i className="ti ti-brain" style={{ fontSize: 16, color: 'var(--color-status-ok)', opacity: 0.6 }} aria-hidden="true" />
       </div>
       <div className="p-plate-3">
         <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-status-ok)] mb-plate-2">
-          Coach-advies · {workoutTitle} · {formatDate(date)}
+          voor volgende {workoutTitle} · gebaseerd op {formatDateHuman(date)}
         </p>
         <div className="flex flex-col">
-          {allAdvices.map((a) => (
-            <AdviceRow key={a.exercise_title} advice={a} />
+          {visible.map((a) => (
+            <AdviceRow key={`${a.action}:${a.exercises[0]}`} advice={a} />
           ))}
         </div>
+        {hasMore && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-2 font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          >
+            {expanded ? '↑ minder' : `↓ ${allGrouped.length - VISIBLE_MAX} meer`}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -517,17 +569,20 @@ function CoachAdviceCard({ advice, onNavigate }) {
 function AdviceRow({ advice }) {
   const color = actionColor(advice.action)
   const label = actionLabel(advice.action)
-  const { bestSet, repRange, targetWeight, targetReps, action } = advice
+  const { bestSet, repRange, targetWeight, targetReps, action, exercises } = advice
+  const isGrouped = exercises.length > 1
 
   let targetStr = ''
-  if (action === 'gewicht_omhoog' && targetWeight) {
-    targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
-  } else if (action === 'reps_omhoog') {
-    targetStr = `${bestSet.weight_kg} kg × ${targetReps || `${repRange.min}–${repRange.max}`}`
-  } else if (action === 'handhaven' || action === 'consolideren') {
-    targetStr = `${bestSet.weight_kg} kg × ${repRange.min}–${repRange.max}`
-  } else if (action === 'gewicht_omlaag' && targetWeight) {
-    targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
+  if (!isGrouped) {
+    if (action === 'gewicht_omhoog' && targetWeight) {
+      targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
+    } else if (action === 'reps_omhoog') {
+      targetStr = `${bestSet.weight_kg} kg × ${targetReps || `${repRange.min}–${repRange.max}`}`
+    } else if (action === 'handhaven' || action === 'consolideren') {
+      targetStr = `${bestSet.weight_kg} kg × ${repRange.min}–${repRange.max}`
+    } else if (action === 'gewicht_omlaag' && targetWeight) {
+      targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
+    }
   }
 
   return (
@@ -535,7 +590,6 @@ function AdviceRow({ advice }) {
       className="py-2.5 border-b border-[var(--color-bg)] last:border-0"
       style={{ paddingLeft: 10, borderLeft: `3px solid ${color}` }}
     >
-      {/* Regel 1: badge + naam */}
       <div className="flex items-center gap-1.5 mb-1">
         <span
           className="font-[var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm"
@@ -544,11 +598,16 @@ function AdviceRow({ advice }) {
           {label}
         </span>
         <span className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)] truncate">
-          {advice.exercise_title}
+          {isGrouped ? `${exercises.length} oefeningen` : exercises[0]}
         </span>
       </div>
 
-      {/* Regel 2: vorige → doel */}
+      {isGrouped && (
+        <p className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)] mb-0.5 truncate">
+          {exercises.slice(0, 4).join(' · ')}{exercises.length > 4 ? ' …' : ''}
+        </p>
+      )}
+
       {targetStr && (
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
@@ -561,7 +620,6 @@ function AdviceRow({ advice }) {
         </div>
       )}
 
-      {/* Regel 3: uitleg */}
       <p className="font-[var(--font-mono)] text-[9px]" style={{ color: `${color}99` }}>
         {advice.advice}
       </p>
@@ -573,13 +631,16 @@ function AdviceRow({ advice }) {
 
 function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }) {
   const loaded = weekVolume !== null
+  const isEmptyWeek = weekVolume && weekVolume.volumeKg === 0 && weekVolume.setCount === 0
 
   function delta(current, previous) {
     if (!previous || previous === 0) return null
     return Math.round(((current - previous) / previous) * 100)
   }
 
-  const volDelta = loaded && prevWeekVolume ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg) : null
+  const volDelta = loaded && !isEmptyWeek && prevWeekVolume
+    ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg)
+    : null
 
   return (
     <button
@@ -598,6 +659,15 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
 
       {!weekVolume ? (
         <p className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">Laden...</p>
+      ) : isEmptyWeek ? (
+        <div>
+          <p className="font-[var(--font-body)] text-sm text-[var(--color-text-secondary)] leading-snug">
+            Week gestart
+          </p>
+          <p className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)] mt-0.5 opacity-60">
+            nog geen workout
+          </p>
+        </div>
       ) : (
         <>
           {/* Huidige week */}
@@ -649,8 +719,8 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
             </div>
           )}
 
-          {/* vs beste week */}
-          {bestWeek && (
+          {/* vs beste week — verborgen bij 0% */}
+          {bestWeek && bestWeek.pct > 0 && (
             <div>
               <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--color-border)', overflow: 'hidden' }}>
                 <div style={{
@@ -663,7 +733,7 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
                 }} />
               </div>
               <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">
-                {bestWeek.pct}% beste week
+                {bestWeek.pct}% van beste week
               </span>
             </div>
           )}
@@ -733,15 +803,15 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
             className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
           >
             <div className="flex items-center gap-plate-2">
-              <SignalIcon type="warn" icon="trending-down" />
+              <SignalIcon type="warn" icon="minus" />
               <div>
                 <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{p.exercise_title}</p>
                 <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  e1RM {p.sessions.map((s) => `${s.e1rm}kg`).join(' → ')} · RPE {p.rpeTrend}
+                  {p.sessions.length} sessies op rij geen progressie · e1RM {p.sessions[p.sessions.length - 1]?.e1rm} kg
                 </p>
               </div>
             </div>
-            <SignalBadge label="Plateau" color="warn" />
+            <SignalBadge label="plateau" color="warn" />
           </button>
         ))}
 
@@ -753,7 +823,6 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
             className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
           >
             <div className="flex items-center gap-plate-2">
-              {/* Gouden trophy */}
               <div style={{
                 width: 34, height: 34, borderRadius: 9, flexShrink: 0,
                 background: 'linear-gradient(135deg, rgba(255,196,0,0.18), rgba(255,140,0,0.12))',
@@ -761,7 +830,7 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
                 color: '#FFB800',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <i className="ti ti-trophy" style={{ fontSize: 16 }} aria-hidden="true" />
+                <i className="ti ti-medal" style={{ fontSize: 16 }} aria-hidden="true" />
               </div>
               <div>
                 <p className="font-[var(--font-body)] text-sm font-semibold text-[var(--color-text-primary)]">
@@ -788,7 +857,7 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
               letterSpacing: '0.06em',
               flexShrink: 0,
             }}>
-              PR ✦
+              PR
             </span>
           </button>
         ))}
