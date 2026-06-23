@@ -105,26 +105,25 @@ function adviseExercise(exerciseTitle, currentSets) {
   if (reps < range.min) {
     action = 'gewicht_omlaag'
     targetWeight = Math.max(weight_kg - inc, 1)
-    advice = `${weight_kg} kg is te zwaar (${reps} reps < min ${range.min}) — probeer ${targetWeight} kg`
+    advice = `Te zwaar voor de range — verlaag naar ${targetWeight} kg`
   } else if (reps >= range.max && effectiveRpe <= 8.5) {
     action = 'gewicht_omhoog'
     targetWeight = weight_kg + inc
-    advice = `${reps} reps @ ${weight_kg} kg met RPE ${effectiveRpe} — klaar voor ${targetWeight} kg`
+    advice = `Bovenkant range behaald met lage RPE — gewicht omhoog`
   } else if (reps >= range.max && effectiveRpe > 8.5) {
     action = 'consolideren'
     targetReps = `${range.min}–${range.max}`
-    advice = `${reps} reps gehaald maar RPE ${effectiveRpe} — nog een ronde op ${weight_kg} kg`
+    advice = `Reps gehaald maar RPE te hoog — nog een ronde consolideren`
   } else if (reps < range.max && effectiveRpe <= 8.0) {
     action = 'reps_omhoog'
     targetReps = `${reps + 1}–${range.max}`
-    advice = `RPE ${effectiveRpe} — ruimte voor meer reps, push naar ${reps + 1}–${range.max}`
+    advice = `Ruimte in range, RPE laag — push reps omhoog`
   } else if (effectiveRpe >= 9.0) {
-    action = 'gewicht_omlaag'
-    targetWeight = Math.max(weight_kg - inc, 1)
-    advice = `RPE ${effectiveRpe} — te intensief, ga naar ${targetWeight} kg of schrap een set`
+    action = 'handhaven'
+    advice = `Reps in range maar zwaar — handhaven en bouw ritme op`
   } else {
     action = 'handhaven'
-    advice = `${weight_kg} kg × ${reps} reps — zelfde gewicht, probeer ${Math.min(reps + 1, range.max)} reps`
+    advice = `Goed gewicht, RPE op punt — probeer bovenkant range`
   }
 
   return {
@@ -210,26 +209,44 @@ export async function fetchCoachAdviceForType(workoutTitle) {
  *
  * Geeft een score 1–10 + een korte statuslabel.
  */
-export async function calculateReadinessScore() {
-  const { data: workouts, error } = await supabase
-    .from('workouts')
-    .select('id, start_date')
-    .order('start_date', { ascending: false })
-    .limit(5)
+export async function calculateReadinessScore(workoutTitle = null) {
+  // Zoek de laatste workout — bij voorkeur van hetzelfde type als de volgende geplande
+  let lastWorkout = null
 
-  if (error) throw error
-  if (!workouts || workouts.length === 0) return { score: 5, label: 'Onvoldoende data', color: 'neutral' }
+  if (workoutTitle) {
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('id, start_date')
+      .eq('title', workoutTitle)
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    lastWorkout = data
+  }
+
+  if (!lastWorkout) {
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('id, start_date')
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    lastWorkout = data
+  }
+
+  if (!lastWorkout) return { score: 5, label: 'Onvoldoende data', color: 'neutral', daysSinceLast: null, avgRpe: 8.0 }
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const lastDate = new Date(workouts[0].start_date + 'T00:00:00Z')
+  const lastDate = new Date(lastWorkout.start_date + 'T00:00:00Z')
   const daysSinceLast = Math.round((today - lastDate) / 86400000)
 
-  // Haal RPE op van laatste sessie
   const { data: lastSets, error: sErr } = await supabase
     .from('sets')
     .select('rpe')
-    .eq('workout_id', workouts[0].id)
+    .eq('workout_id', lastWorkout.id)
     .eq('set_type', 'normal')
     .not('rpe', 'is', null)
 
@@ -239,16 +256,14 @@ export async function calculateReadinessScore() {
     ? lastSets.reduce((sum, s) => sum + s.rpe, 0) / lastSets.length
     : 8.0
 
-  // Score opbouwen
   let score = 7.0
 
-  // Dagen factor
-  if (daysSinceLast === 0) score -= 2.5      // vandaag al getraind
-  else if (daysSinceLast === 1) score += 0.5 // gisteren getraind, prima
-  else if (daysSinceLast === 2) score += 1.0 // twee dagen rust, goed hersteld
-  else if (daysSinceLast >= 4) score -= 0.5  // lang niet getraind, lichte detraining
+  // Voor een split (Push/Pull/Legs/Upper) zijn 3–6 dagen tussen dezelfde sessie normaal
+  if (daysSinceLast === 0) score -= 2.5
+  else if (daysSinceLast <= 4) score += 0.5
+  else if (daysSinceLast <= 7) score += 1.0
+  else if (daysSinceLast >= 10) score -= 0.5
 
-  // RPE factor
   if (avgRpe >= 9.5) score -= 2.0
   else if (avgRpe >= 9.0) score -= 1.0
   else if (avgRpe <= 7.0) score += 0.5
@@ -257,7 +272,7 @@ export async function calculateReadinessScore() {
 
   let label, color
   if (score >= 8) { label = 'Goed hersteld'; color = 'ok' }
-  else if (score >= 6) { label = 'Klaar om te trainen'; color: 'ok'; color = 'neutral' }
+  else if (score >= 6) { label = 'Klaar om te trainen'; color = 'neutral' }
   else if (score >= 4) { label = 'Matig hersteld'; color = 'warn' }
   else { label = 'Neem rust'; color = 'danger' }
 

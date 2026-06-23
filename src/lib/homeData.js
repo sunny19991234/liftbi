@@ -126,6 +126,36 @@ async function fetchVolumeForWeek(weekStartDate) {
 }
 
 /**
+ * Komende geplande sessies binnen daysForward dagen, oud → nieuw.
+ */
+export async function fetchUpcomingPlanned(daysForward = 4) {
+  const today = getTodayStr()
+  const end = addDays(today, daysForward)
+  const { data, error } = await supabase
+    .from('planned_workouts')
+    .select('id, planned_date, title')
+    .eq('status', 'planned')
+    .gte('planned_date', today)
+    .lte('planned_date', end)
+    .order('planned_date', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Laatste N voltooide workouts, meest recent eerst.
+ */
+export async function fetchRecentWorkouts(n = 5) {
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id, title, start_date')
+    .order('start_date', { ascending: false })
+    .limit(n)
+  if (error) throw error
+  return data ?? []
+}
+
+/**
  * Volledige huidige kalenderweek (maandag t/m zondag).
  */
 export async function fetchWeekVolume() {

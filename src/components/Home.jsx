@@ -17,6 +17,8 @@ import {
   fetchDayStrip,
   fetchWeekVolume,
   fetchPreviousWeekVolume,
+  fetchRecentWorkouts,
+  fetchUpcomingPlanned,
 } from '../lib/homeData'
 import { getTodayStr } from '../lib/calendarData'
 import { detectPlateaus } from '../lib/plateauData'
@@ -31,7 +33,6 @@ import {
 import { parseHevyCsv } from '../lib/hevyParser'
 import { getToken, clearToken } from '../lib/auth'
 
-const WEEKDAY_SHORT = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 
 // Workout-types in volgorde van de split — voor coach-advies ophalen
@@ -92,59 +93,64 @@ export default function Home({ onNavigate, onTokenExpired }) {
   const [streak, setStreak]                   = useState(null)
   const [coachAdvice, setCoachAdvice]         = useState(null) // { workoutTitle, date, advices }
   const [bestWeek, setBestWeek]               = useState(null) // { bestWeekVolume, pct }
+  const [recentWorkouts, setRecentWorkouts]   = useState(null)
+  const [upcomingPlanned, setUpcomingPlanned] = useState(null)
   const [error, setError]                     = useState(null)
 
   const today = getTodayStr()
 
   function loadAll() {
-    // Basis-data parallel laden
-    Promise.all([
-      fetchNextPlanned(),
-      fetchDayStrip(),
-      fetchWeekVolume(),
-      fetchPreviousWeekVolume(),
-      detectPlateaus(),
-      detectImbalances(),
-      calculateAllPRs(),
-      calculateReadinessScore(),
-      calculateStreak(3),
-    ])
-      .then(([next, strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData]) => {
-        setNextPlanned(next)
-        setDayStrip(strip)
-        setWeekVolume(vol)
-        setPrevWeekVolume(prevVol)
-        setPlateaus(plateauList)
-        setImbalances(imbalanceList)
-        setTopPRs(rankTopPRs(allPRs, 5))
-        setReadiness(readinessData)
-        setStreak(streakData)
+    async function run() {
+      // Eerst nextPlanned ophalen — nodig voor type-specifieke readiness berekening
+      const next = await fetchNextPlanned()
+      setNextPlanned(next)
 
-        // Beste-week vergelijking hangt af van weekvolume
-        fetchBestWeekComparison(vol.volumeKg)
-          .then(setBestWeek)
-          .catch(() => {}) // niet-kritiek
+      // Daarna alles parallel, readiness nu met het juiste workout-type
+      const [strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData, recentWos, upcomingWos] =
+        await Promise.all([
+          fetchDayStrip(),
+          fetchWeekVolume(),
+          fetchPreviousWeekVolume(),
+          detectPlateaus(),
+          detectImbalances(),
+          calculateAllPRs(),
+          calculateReadinessScore(next?.title),
+          calculateStreak(3),
+          fetchRecentWorkouts(5),
+          fetchUpcomingPlanned(4),
+        ])
 
-        // Coach-advies: laad voor de meest recente sessie ongeacht type
-        loadCoachAdvice()
-      })
-      .catch((err) => setError(err.message))
+      setDayStrip(strip)
+      setWeekVolume(vol)
+      setPrevWeekVolume(prevVol)
+      setPlateaus(plateauList)
+      setImbalances(imbalanceList)
+      setTopPRs(rankTopPRs(allPRs, 5))
+      setReadiness(readinessData)
+      setStreak(streakData)
+      setRecentWorkouts(recentWos)
+      setUpcomingPlanned(upcomingWos)
+
+      fetchBestWeekComparison(vol.volumeKg).then(setBestWeek).catch(() => {})
+      loadCoachAdvice(next)
+    }
+    run().catch((err) => setError(err.message))
   }
 
-  async function loadCoachAdvice() {
-    // Probeer elk split-type totdat we één vinden met data
-    for (const title of SPLIT_TITLES) {
+  async function loadCoachAdvice(nextWorkout) {
+    // Prioriteit: volgende geplande workout type
+    const priorityTitle = nextWorkout?.title
+    if (priorityTitle) {
       try {
-        const advice = await fetchCoachAdviceForType(title)
+        const advice = await fetchCoachAdviceForType(priorityTitle)
         if (advice && advice.advices.length > 0) {
-          // Maar we willen de MEEST RECENTE sessie overall, niet per type.
-          // Dus we halen alle types op en pakken degene met de recentste datum.
-          break
+          setCoachAdvice(advice)
+          return
         }
-      } catch (_) { /* continue */ }
+      } catch (_) { /* fall through */ }
     }
 
-    // Haal voor alle split-types op en geef de meest recente
+    // Fallback: meest recente sessie overall
     const results = await Promise.allSettled(
       SPLIT_TITLES.map((t) => fetchCoachAdviceForType(t))
     )
@@ -154,8 +160,6 @@ export default function Home({ onNavigate, onTokenExpired }) {
       .filter((v) => v.advices.length > 0)
 
     if (valid.length === 0) return
-
-    // Meest recente op basis van datum
     valid.sort((a, b) => b.date.localeCompare(a.date))
     setCoachAdvice(valid[0])
   }
@@ -181,49 +185,37 @@ export default function Home({ onNavigate, onTokenExpired }) {
         nextPlanned={nextPlanned}
         todayInfo={todayInfo}
         todayIsRestDay={todayIsRestDay}
-        imbalances={imbalances}
+        streak={streak}
+        recentWorkouts={recentWorkouts}
+        upcomingPlanned={upcomingPlanned}
         onNavigate={onNavigate}
       />
 
-      {/* 2. Streak + heatmap */}
-      {streak !== null && (
-        <StreakCard streak={streak} />
-      )}
-
-      {/* 3. Coach-advies */}
+      {/* 2. Coach-advies */}
       {coachAdvice && coachAdvice.advices.length > 0 && (
         <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
       )}
 
-      {/* 4. Week vs beste week */}
-      <WeekComparisonCard
-        weekVolume={weekVolume}
-        prevWeekVolume={prevWeekVolume}
-        bestWeek={bestWeek}
-        onNavigate={onNavigate}
-      />
-
-      {/* 5. Proactieve signalen */}
-      <ProactiveSignals
-        plateaus={plateaus}
-        imbalances={imbalances}
-        topPRs={topPRs}
-        onNavigate={onNavigate}
-      />
-
-      {/* 6. Dagstrip */}
-      <div className="surface rounded-xl p-plate-3">
-        <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm mb-plate-2">
-          Recent &amp; aankomend
-        </p>
-        {!dayStrip ? (
-          <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
-        ) : (
-          <DayStrip days={dayStrip} onNavigate={onNavigate} />
-        )}
+      {/* 3. Streak + Weekstatistieken — naast elkaar */}
+      <div className="grid grid-cols-2 gap-plate-3">
+        {streak !== null && <StreakCard streak={streak} />}
+        <WeekComparisonCard
+          weekVolume={weekVolume}
+          prevWeekVolume={prevWeekVolume}
+          bestWeek={bestWeek}
+          onNavigate={onNavigate}
+        />
       </div>
 
-      {/* 7. Upload — klein, onderaan */}
+      {/* 4. Proactieve signalen */}
+      <ProactiveSignals
+        plateaus={plateaus}
+        topPRs={topPRs}
+        recentWorkouts={recentWorkouts}
+        onNavigate={onNavigate}
+      />
+
+      {/* 5. Upload — klein, onderaan */}
       <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
 
     </div>
@@ -232,37 +224,37 @@ export default function Home({ onNavigate, onTokenExpired }) {
 
 // ─── Readiness hero ───────────────────────────────────────────────────────────
 
-function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, imbalances, onNavigate }) {
+function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, streak, recentWorkouts, upcomingPlanned, onNavigate }) {
   const score  = readiness?.score ?? null
   const color  = score !== null ? readinessColor(score) : '#9499A1'
-  const radius = 26
+  const radius = 22
   const circ   = 2 * Math.PI * radius
   const filled = score !== null ? (score / 10) * circ : 0
+  const todayStr = getTodayStr()
 
-  // Context-redenen voor de volgende sessie
+  // Context-redenen — type-specifiek
   const reasons = []
   if (readiness) {
-    if (readiness.daysSinceLast === 1) reasons.push({ dot: 'ok',   text: 'Gisteren getraind — 1 dag rust' })
-    else if (readiness.daysSinceLast === 2) reasons.push({ dot: 'ok', text: '2 dagen rust — goed hersteld' })
-    else if (readiness.daysSinceLast >= 3) reasons.push({ dot: 'info', text: `${readiness.daysSinceLast} dagen rust — klaar` })
-    else if (readiness.daysSinceLast === 0) reasons.push({ dot: 'warn', text: 'Vandaag al getraind' })
-
-    if (readiness.avgRpe <= 7.5) reasons.push({ dot: 'ok',   text: `Gem. RPE vorige sessie ${readiness.avgRpe} — licht` })
-    else if (readiness.avgRpe <= 8.5) reasons.push({ dot: 'info', text: `Gem. RPE vorige sessie ${readiness.avgRpe}` })
-    else reasons.push({ dot: 'warn', text: `Gem. RPE vorige sessie ${readiness.avgRpe} — zwaar` })
-  }
-
-  // Imbalance als context voor volgende sessie
-  if (imbalances && imbalances.length > 0) {
-    const topIm = imbalances[0]
-    if (topIm.status === 'low') {
-      reasons.push({ dot: 'warn', text: `${topIm.muscle_group} onder target (${topIm.setCount}/${topIm.min} sets)` })
+    const d = readiness.daysSinceLast
+    const type = nextPlanned?.title ?? null
+    if (d === 0) {
+      reasons.push({ dot: 'warn', text: 'Vandaag al getraind' })
+    } else if (d != null && d <= 4) {
+      reasons.push({ dot: 'ok', text: `${d}d rust${type ? ` sinds ${type}` : ''}` })
+    } else if (d != null && d <= 8) {
+      reasons.push({ dot: 'ok', text: `${d} dagen rust — goed hersteld` })
+    } else if (d != null) {
+      reasons.push({ dot: 'info', text: `${d} dagen geleden — lang niet getraind` })
     }
+
+    if (readiness.avgRpe <= 7.5) reasons.push({ dot: 'ok',   text: `Vorige ${type ?? 'sessie'} RPE ${readiness.avgRpe} — licht` })
+    else if (readiness.avgRpe <= 8.5) reasons.push({ dot: 'info', text: `Vorige ${type ?? 'sessie'} RPE ${readiness.avgRpe}` })
+    else reasons.push({ dot: 'warn', text: `Vorige ${type ?? 'sessie'} RPE ${readiness.avgRpe} — zwaar` })
   }
 
   const isLoading = score === null && nextPlanned === undefined
 
-  // Bepaal wat te tonen als title
+  // Bepaal titel en label
   let heroTitle = '—'
   let heroLabel = 'Volgende sessie'
   if (todayInfo?.type === 'done') {
@@ -270,91 +262,169 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, imba
     heroLabel = 'Vandaag voltooid'
   } else if (nextPlanned) {
     heroTitle = nextPlanned.title
-    heroLabel = nextPlanned.planned_date === getTodayStr() ? 'Vandaag gepland' : 'Volgende sessie'
+    heroLabel = nextPlanned.planned_date === todayStr ? 'Vandaag gepland' : 'Volgende sessie'
   } else if (todayIsRestDay) {
     heroTitle = 'Rustdag'
     heroLabel = 'Vandaag'
   }
 
+  // Mesocyclus strip — max 7d terug, 4d vooruit
+  const todayDate = new Date(todayStr + 'T00:00:00Z')
+  const mesoItems = []
+  if (recentWorkouts) {
+    for (const w of [...recentWorkouts].reverse()) {
+      const d = new Date(w.start_date + 'T00:00:00Z')
+      const diff = Math.round((todayDate - d) / 86400000)
+      if (diff > 7) continue
+      mesoItems.push({ title: w.title, diff, isPast: true, isToday: w.start_date === todayStr })
+    }
+  }
+  // Vandaag gepland maar nog niet gedaan
+  if (nextPlanned && nextPlanned.planned_date === todayStr && todayInfo?.type !== 'done') {
+    mesoItems.push({ title: nextPlanned.title, diff: 0, isPast: false, isNext: true, isToday: true })
+  }
+  // Toekomst: max 4 dagen vooruit (alle komende geplande sessies)
+  for (const p of (upcomingPlanned ?? [])) {
+    if (p.planned_date <= todayStr) continue
+    const d = new Date(p.planned_date + 'T00:00:00Z')
+    const diff = Math.round((d - todayDate) / 86400000)
+    if (diff > 4) break
+    mesoItems.push({ title: p.title, diff, isPast: false, isNext: true })
+  }
+  const mesoWeek = Math.max(1, streak?.weeks ?? 1)
+
+  // Dynamisch icon op basis van readiness score
+  const heroIcon = score === null ? 'barbell' : score >= 8 ? 'flame' : score >= 6 ? 'bolt' : 'moon'
+
   return (
     <button
       onClick={() => onNavigate('agenda')}
       className="surface-hero text-left rounded-xl w-full hover:brightness-110 transition-all"
-      style={{ overflow: 'hidden' }}
+      style={{ overflow: 'hidden', position: 'relative' }}
     >
       <div className="loaded-bar" style={{ '--load-pct': score !== null ? `${score * 10}%` : '0%' }} />
-      <div className="flex items-center gap-plate-3 p-plate-3">
+
+      {/* Icon rechtsboven */}
+      <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 10 }}>
+        <i className={`ti ti-${heroIcon}`} style={{ fontSize: 18, color, opacity: 0.75 }} aria-hidden="true" />
+      </div>
+
+      <div className="flex items-center gap-3 px-plate-3 pt-plate-2 pb-2">
         {/* SVG ring */}
         <div style={{ flexShrink: 0 }}>
-          <svg width="68" height="68" viewBox="0 0 68 68">
-            <circle cx="34" cy="34" r={radius} fill="none" stroke="var(--color-border)" strokeWidth="5" />
+          <svg width="56" height="56" viewBox="0 0 56 56">
+            <circle cx="28" cy="28" r={radius} fill="none" stroke="var(--color-border)" strokeWidth="4" />
             {score !== null && (
               <circle
-                cx="34" cy="34" r={radius}
-                fill="none"
-                stroke={color}
-                strokeWidth="5"
+                cx="28" cy="28" r={radius}
+                fill="none" stroke={color} strokeWidth="4"
                 strokeDasharray={`${circ}`}
                 strokeDashoffset={`${circ - filled}`}
                 strokeLinecap="round"
-                transform="rotate(-90 34 34)"
+                transform="rotate(-90 28 28)"
                 style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
               />
             )}
             {isLoading ? (
-              <text x="34" y="39" textAnchor="middle"
-                fontFamily="JetBrains Mono" fontSize="11" fill="var(--color-text-secondary)">
-                …
-              </text>
+              <text x="28" y="33" textAnchor="middle" fontFamily="JetBrains Mono" fontSize="10" fill="var(--color-text-secondary)">…</text>
             ) : (
               <>
-                <text x="34" y="31" textAnchor="middle"
-                  fontFamily="Fraunces,serif" fontSize="16" fontWeight="600" fill={color}>
-                  {score}
-                </text>
-                <text x="34" y="44" textAnchor="middle"
-                  fontFamily="JetBrains Mono" fontSize="8"
-                  fill="var(--color-text-secondary)" letterSpacing="0.05em">
-                  READY
-                </text>
+                <text x="28" y="25" textAnchor="middle" fontFamily="Fraunces,serif" fontSize="14" fontWeight="600" fill={color}>{score}</text>
+                <text x="28" y="36" textAnchor="middle" fontFamily="JetBrains Mono" fontSize="7" fill="var(--color-text-secondary)" letterSpacing="0.05em">READY</text>
               </>
             )}
           </svg>
         </div>
 
         {/* Sessie-info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-6">
           <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest mb-0.5"
             style={{ color: todayInfo?.type === 'done' ? 'var(--color-status-ok)' : 'var(--color-data)' }}>
             {heroLabel}
           </p>
-          <h2 className="font-[var(--font-display)] font-semibold text-xl tracking-tight leading-tight text-[var(--color-text-primary)] mb-plate-1">
+          <h2 className="font-[var(--font-display)] font-semibold text-xl tracking-tight leading-tight text-[var(--color-text-primary)] mb-1">
             {heroTitle}
           </h2>
           <div className="flex flex-col gap-0.5">
-            {reasons.slice(0, 3).map((r, i) => (
+            {reasons.slice(0, 2).map((r, i) => (
               <div key={i} className="flex items-center gap-1.5">
                 <span style={{
-                  width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-                  background: r.dot === 'ok' ? 'var(--color-status-ok)'
-                    : r.dot === 'warn' ? 'var(--color-status-low)'
-                    : '#3E7CB1',
+                  width: 4, height: 4, borderRadius: '50%', flexShrink: 0,
+                  background: r.dot === 'ok' ? 'var(--color-status-ok)' : r.dot === 'warn' ? 'var(--color-status-low)' : '#3E7CB1',
                 }} />
-                <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  {r.text}
-                </span>
+                <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">{r.text}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Datum */}
-        {nextPlanned && nextPlanned.planned_date !== getTodayStr() && (
-          <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data flex-shrink-0 self-start">
-            {formatDate(nextPlanned.planned_date)}
-          </p>
-        )}
       </div>
+
+      {/* Mesocyclus strip — tijdlijn met pijltjes */}
+      {mesoItems.length > 0 && (
+        <div className="border-t border-[var(--color-border-subtle)] px-plate-3 py-2.5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)]">
+              Mesocyclus — Week {mesoWeek}
+            </span>
+          </div>
+          <div className="flex items-end overflow-x-auto gap-0" style={{ scrollbarWidth: 'none' }}>
+            {mesoItems.map((item, i) => {
+              const isCurrent = item.isToday || item.diff === 0
+              const isNext = item.isNext && !item.isToday
+              let timeLabel = ''
+              if (item.diff === 0) timeLabel = 'vandaag'
+              else if (item.isPast && item.diff === 1) timeLabel = 'gisteren'
+              else if (item.isPast) timeLabel = `${item.diff}d`
+              else if (item.diff === 1) timeLabel = 'morgen'
+              else timeLabel = `+${item.diff}d`
+              return (
+                <div key={i} className="flex items-center flex-shrink-0">
+                  {/* Verbindingslijn tussen items */}
+                  {i > 0 && (
+                    <div style={{
+                      width: 14, height: 1,
+                      background: 'var(--color-border)',
+                      marginBottom: 14,
+                    }} />
+                  )}
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div
+                      className="font-[var(--font-mono)] text-[11px] px-2.5 py-1 rounded-lg whitespace-nowrap"
+                      style={{
+                        background: isCurrent
+                          ? color
+                          : isNext
+                          ? 'var(--color-card)'
+                          : 'var(--color-bg)',
+                        color: isCurrent
+                          ? 'var(--color-bg)'
+                          : isNext
+                          ? 'var(--color-data)'
+                          : 'var(--color-text-secondary)',
+                        fontWeight: isCurrent ? 700 : isNext ? 600 : 400,
+                        border: isCurrent
+                          ? 'none'
+                          : isNext
+                          ? '1px solid var(--color-data)'
+                          : '1px solid var(--color-border)',
+                        boxShadow: isCurrent ? `0 0 0 3px ${color}25` : 'none',
+                      }}
+                    >
+                      {item.title}
+                    </div>
+                    <span
+                      className="font-[var(--font-mono)] text-[8px]"
+                      style={{ color: isCurrent ? color : 'var(--color-text-secondary)' }}
+                    >
+                      {timeLabel}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </button>
   )
 }
@@ -363,61 +433,54 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, imba
 
 function StreakCard({ streak }) {
   const { weeks, heatmap } = streak
-  // 10 weken × 7 dagen
-  const weeks10 = []
-  for (let w = 0; w < 10; w++) {
-    weeks10.push(heatmap.slice(w * 7, w * 7 + 7))
+  // Laatste 5 weken × 7 dagen (compact voor side-by-side)
+  const weeks5 = []
+  for (let w = 5; w < 10; w++) {
+    weeks5.push(heatmap.slice(w * 7, w * 7 + 7))
   }
 
   return (
-    <div className="surface rounded-xl p-plate-3">
-      <div className="flex items-center justify-between mb-plate-2">
-        <div>
-          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-0.5">
-            Consistentie
-          </p>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-accent)] leading-none">
-              {weeks}
-            </span>
-            <span className="font-[var(--font-body)] text-xs text-[var(--color-text-secondary)]">
-              {weeks === 1 ? 'week op rij' : 'weken op rij'} ≥3×/week
-            </span>
-          </div>
-        </div>
-        {weeks >= 4 && (
-          <span className="text-xl" title="Streak">🔥</span>
-        )}
+    <div className="surface rounded-xl px-3 py-2 relative" style={{ position: 'relative' }}>
+      {weeks >= 4 && (
+        <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }} title="Streak">🔥</span>
+      )}
+      <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-1.5">
+        Consistentie
+      </p>
+      <div className="flex items-baseline gap-1 mb-2">
+        <span className="font-[var(--font-display)] font-semibold text-2xl text-[var(--color-accent)] leading-none">
+          {weeks}
+        </span>
+        <span className="font-[var(--font-body)] text-[10px] text-[var(--color-text-secondary)]">
+          {weeks === 1 ? 'week' : 'weken'} op rij
+        </span>
       </div>
 
-      {/* Heatmap grid: 10 kolommen (weken) × 7 rijen (dagen) */}
-      <div className="flex gap-[3px]">
-        {weeks10.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
+      {/* Heatmap: 5 weken × 7 dagen, vult de volle breedte */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
+        {weeks5.map((week, wi) => (
+          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {week.map((day, di) => (
               <div
                 key={di}
                 title={day.date}
                 style={{
-                  width: 13,
-                  height: 13,
-                  borderRadius: 3,
-                  background: day.isToday
-                    ? 'var(--color-accent)'
-                    : day.done
-                    ? 'rgba(34,197,94,0.7)'
-                    : 'var(--color-card)',
-                  boxShadow: day.isToday ? '0 0 0 2px var(--color-bg), 0 0 0 3px var(--color-accent)' : 'none',
-                  flexShrink: 0,
+                  width: '100%', height: 11,
+                  borderRadius: 2,
+                  background: day.isToday ? 'var(--color-accent)'
+                    : day.done ? 'rgba(34,197,94,0.7)'
+                    : 'var(--color-border)',
+                  boxShadow: day.isToday ? '0 0 0 1px var(--color-bg), 0 0 0 2px var(--color-accent)' : 'none',
                 }}
               />
             ))}
           </div>
         ))}
       </div>
-      <div className="flex justify-between mt-plate-1">
-        <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">10 weken geleden</span>
-        <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">vandaag</span>
+      {/* X-as */}
+      <div className="flex justify-between mt-1.5">
+        <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">4w geleden</span>
+        <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">vandaag</span>
       </div>
     </div>
   )
@@ -427,61 +490,25 @@ function StreakCard({ streak }) {
 
 function CoachAdviceCard({ advice, onNavigate }) {
   const { workoutTitle, date, advices } = advice
-
-  // Splits in actionable (omhoog) vs overig
   const actionable = advices.filter((a) => ['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
   const rest       = advices.filter((a) => !['gewicht_omhoog', 'reps_omhoog'].includes(a.action))
+  const allAdvices = [...actionable, ...rest]
 
   return (
-    <div className="surface rounded-xl overflow-hidden">
-      <div className="loaded-bar" style={{ '--load-pct': '100%' }} />
+    <div className="surface rounded-xl overflow-hidden" style={{ position: 'relative' }}>
+      {/* Icon rechtsboven */}
+      <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 10 }}>
+        <i className="ti ti-brain" style={{ fontSize: 16, color: 'var(--color-status-ok)', opacity: 0.6 }} aria-hidden="true" />
+      </div>
       <div className="p-plate-3">
-        <div className="flex items-center justify-between mb-plate-2">
-          <div>
-            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-status-ok)] mb-0.5">
-              Coach-advies — volgende {workoutTitle}
-            </p>
-            <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-              Op basis van {workoutTitle} van {formatDate(date)}
-            </p>
-          </div>
-          <button
-            onClick={() => onNavigate('rpe')}
-            className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] hover:text-[var(--color-text-primary)]"
-          >
-            RPE-trend →
-          </button>
+        <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-status-ok)] mb-plate-2">
+          Coach-advies · {workoutTitle} · {formatDate(date)}
+        </p>
+        <div className="flex flex-col">
+          {allAdvices.map((a) => (
+            <AdviceRow key={a.exercise_title} advice={a} />
+          ))}
         </div>
-
-        {/* Actionable eerst */}
-        {actionable.length > 0 && (
-          <div className="mb-plate-2">
-            <p className="font-[var(--font-body)] text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wide mb-1">
-              Klaar voor progressie
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {actionable.map((a) => (
-                <AdviceRow key={a.exercise_title} advice={a} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Rest inklapbaar als er veel zijn */}
-        {rest.length > 0 && (
-          <div>
-            {actionable.length > 0 && (
-              <p className="font-[var(--font-body)] text-[10px] text-[var(--color-text-secondary)] uppercase tracking-wide mb-1 mt-plate-2">
-                Overige oefeningen
-              </p>
-            )}
-            <div className="flex flex-col gap-1.5">
-              {rest.map((a) => (
-                <AdviceRow key={a.exercise_title} advice={a} />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -490,39 +517,54 @@ function CoachAdviceCard({ advice, onNavigate }) {
 function AdviceRow({ advice }) {
   const color = actionColor(advice.action)
   const label = actionLabel(advice.action)
-  const { bestSet, repRange } = advice
+  const { bestSet, repRange, targetWeight, targetReps, action } = advice
+
+  let targetStr = ''
+  if (action === 'gewicht_omhoog' && targetWeight) {
+    targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
+  } else if (action === 'reps_omhoog') {
+    targetStr = `${bestSet.weight_kg} kg × ${targetReps || `${repRange.min}–${repRange.max}`}`
+  } else if (action === 'handhaven' || action === 'consolideren') {
+    targetStr = `${bestSet.weight_kg} kg × ${repRange.min}–${repRange.max}`
+  } else if (action === 'gewicht_omlaag' && targetWeight) {
+    targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
+  }
 
   return (
-    <div className="flex items-start justify-between gap-plate-2 py-1 border-b border-[var(--color-bg)] last:border-0">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span
-            className="font-[var(--font-mono)] text-[10px] px-1.5 py-0.5 rounded"
-            style={{ background: `${color}18`, color }}
-          >
-            {label}
+    <div
+      className="py-2.5 border-b border-[var(--color-bg)] last:border-0"
+      style={{ paddingLeft: 10, borderLeft: `3px solid ${color}` }}
+    >
+      {/* Regel 1: badge + naam */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <span
+          className="font-[var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm"
+          style={{ background: `${color}22`, color, fontWeight: 700, letterSpacing: '0.04em' }}
+        >
+          {label}
+        </span>
+        <span className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)] truncate">
+          {advice.exercise_title}
+        </span>
+      </div>
+
+      {/* Regel 2: vorige → doel */}
+      {targetStr && (
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+            {bestSet.weight_kg} kg × {bestSet.reps}{bestSet.rpe != null ? ` · RPE ${bestSet.rpe}` : ''}
           </span>
-          <span className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] truncate">
-            {advice.exercise_title}
+          <span className="font-[var(--font-mono)] text-[10px]" style={{ color: 'var(--color-border)' }}>→</span>
+          <span className="font-[var(--font-mono)] text-[10px] font-semibold" style={{ color }}>
+            {targetStr}
           </span>
         </div>
-        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-          {advice.advice}
-        </p>
-      </div>
-      <div className="text-right flex-shrink-0">
-        <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)] tabular-data">
-          {bestSet.weight_kg} kg × {bestSet.reps}
-        </p>
-        {bestSet.rpe && (
-          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-            RPE {bestSet.rpe}
-          </p>
-        )}
-        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] opacity-50">
-          range {repRange.min}–{repRange.max}
-        </p>
-      </div>
+      )}
+
+      {/* Regel 3: uitleg */}
+      <p className="font-[var(--font-mono)] text-[9px]" style={{ color: `${color}99` }}>
+        {advice.advice}
+      </p>
     </div>
   )
 }
@@ -538,111 +580,99 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
   }
 
   const volDelta = loaded && prevWeekVolume ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg) : null
-  const setDelta = loaded && prevWeekVolume ? delta(weekVolume.setCount, prevWeekVolume.setCount) : null
 
   return (
     <button
       onClick={() => onNavigate('volume')}
-      className="surface text-left rounded-xl p-plate-3 hover:brightness-110 transition-all w-full"
+      className="surface text-left rounded-xl px-3 py-2 hover:brightness-110 transition-all w-full h-full"
+      style={{ position: 'relative' }}
     >
-      <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
-        Week-statistieken
-      </p>
-
-      <div className="grid grid-cols-3 gap-0 items-center">
-        {/* Vorige week */}
-        <div style={{ opacity: 0.4 }}>
-          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-tertiary)] mb-1.5 uppercase">Vorige</p>
-          {!prevWeekVolume ? (
-            <p className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">—</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <MiniMetric val={prevWeekVolume.setCount} unit="sets" />
-              <MiniMetric val={formatKg(prevWeekVolume.volumeKg)} unit="kg" />
-              <MiniMetric val={prevWeekVolume.avgRpe ?? '—'} unit="rpe" />
-            </div>
-          )}
-        </div>
-
-        {/* Divider + delta */}
-        <div className="flex flex-col items-center gap-1 px-2">
-          <div style={{ width: 1, background: 'var(--color-border)', height: 24 }} />
-          {volDelta !== null && <DeltaPill pct={volDelta} />}
-          <div style={{ width: 1, background: 'var(--color-border)', height: 12 }} />
-        </div>
-
-        {/* Deze week */}
-        <div>
-          <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-accent)] mb-1.5 uppercase">Deze week</p>
-          {!weekVolume ? (
-            <p className="font-[var(--font-mono)] text-sm">Laden...</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <BigMetric val={weekVolume.setCount} unit="sets" delta={setDelta} color="var(--color-text-primary)" />
-              <BigMetric val={formatKg(weekVolume.volumeKg)} unit="kg" color="var(--color-accent)" />
-              <BigMetric val={weekVolume.avgRpe ?? '—'} unit="rpe" color="#3E7CB1" />
-            </div>
-          )}
-        </div>
+      {/* Icon rechtsboven */}
+      <div style={{ position: 'absolute', top: 8, right: 10 }}>
+        <i className="ti ti-chart-bar" style={{ fontSize: 15, color: 'var(--color-accent)', opacity: 0.6 }} aria-hidden="true" />
       </div>
 
-      {/* vs beste week */}
-      {bestWeek && weekVolume && (
-        <div className="mt-plate-2 pt-plate-2 border-t border-[var(--color-border-subtle)] flex items-center justify-between">
-          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-            vs all-time beste week ({formatKg(bestWeek.bestWeekVolume)} kg)
-          </span>
-          <div className="flex items-center gap-1.5">
-            <div style={{
-              width: 80,
-              height: 4,
-              borderRadius: 2,
-              background: 'var(--color-border)',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${Math.min(bestWeek.pct, 100)}%`,
-                background: bestWeek.pct >= 90 ? 'var(--color-status-ok)'
-                  : bestWeek.pct >= 70 ? 'var(--color-accent)'
-                  : 'var(--color-status-low)',
-                transition: 'width 0.6s ease-out',
-              }} />
-            </div>
-            <span className="font-[var(--font-mono)] text-[10px]"
-              style={{ color: bestWeek.pct >= 90 ? 'var(--color-status-ok)' : 'var(--color-status-low)' }}>
-              {bestWeek.pct}%
+      <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-1.5">
+        Week
+      </p>
+
+      {!weekVolume ? (
+        <p className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">Laden...</p>
+      ) : (
+        <>
+          {/* Huidige week */}
+          <div className="mb-0.5">
+            <span className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-accent)] leading-none">
+              {formatKg(weekVolume.volumeKg)}
+            </span>
+            <span className="font-[var(--font-body)] text-[9px] text-[var(--color-text-secondary)] ml-1">kg</span>
+          </div>
+          <div className="flex items-center gap-1 mb-2.5">
+            {weekVolume.avgRpe != null && (
+              <span className="font-[var(--font-mono)] text-[10px]" style={{ color: '#3E7CB1' }}>
+                RPE {weekVolume.avgRpe}
+              </span>
+            )}
+            <span style={{ color: 'var(--color-border)', fontSize: 9 }}>·</span>
+            <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
+              {weekVolume.setCount} sets
             </span>
           </div>
-        </div>
+
+          {/* Vorige week */}
+          {prevWeekVolume && (
+            <div className="mb-2 pl-2" style={{ borderLeft: '2px solid var(--color-border)' }}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  vorige
+                </span>
+                {volDelta !== null && <DeltaPill pct={volDelta} />}
+              </div>
+              <div className="font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
+                {formatKg(prevWeekVolume.volumeKg)} kg
+              </div>
+              <div className="flex items-center gap-1">
+                {prevWeekVolume.avgRpe != null && (
+                  <span className="font-[var(--font-mono)] text-[9px]" style={{ color: '#3E7CB199' }}>
+                    RPE {prevWeekVolume.avgRpe}
+                  </span>
+                )}
+                {prevWeekVolume.setCount > 0 && (
+                  <>
+                    <span style={{ color: 'var(--color-border)', fontSize: 9 }}>·</span>
+                    <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">
+                      {prevWeekVolume.setCount} sets
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* vs beste week */}
+          {bestWeek && (
+            <div>
+              <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--color-border)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(bestWeek.pct, 100)}%`,
+                  background: bestWeek.pct >= 90 ? 'var(--color-status-ok)'
+                    : bestWeek.pct >= 70 ? 'var(--color-accent)'
+                    : 'var(--color-status-low)',
+                  transition: 'width 0.6s ease-out',
+                }} />
+              </div>
+              <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">
+                {bestWeek.pct}% beste week
+              </span>
+            </div>
+          )}
+        </>
       )}
     </button>
   )
 }
 
-function MiniMetric({ val, unit }) {
-  return (
-    <div className="flex items-baseline gap-1">
-      <span className="font-[var(--font-mono)] text-sm leading-none text-[var(--color-text-primary)]">{val}</span>
-      <span className="font-[var(--font-body)] text-[9px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{unit}</span>
-    </div>
-  )
-}
-
-function BigMetric({ val, unit, delta, color }) {
-  return (
-    <div className="flex items-baseline gap-1">
-      <span className="font-[var(--font-display)] font-semibold text-xl leading-none tabular-data" style={{ color }}>{val}</span>
-      <span className="font-[var(--font-body)] text-[9px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{unit}</span>
-      {delta !== null && delta !== undefined && (
-        <span className="font-[var(--font-mono)] text-[9px] tabular-data"
-          style={{ color: delta > 0 ? 'var(--color-status-ok)' : delta < 0 ? 'var(--color-status-high)' : 'var(--color-text-tertiary)' }}>
-          {delta > 0 ? `+${delta}%` : `${delta}%`}
-        </span>
-      )}
-    </div>
-  )
-}
 
 function DeltaPill({ pct }) {
   const isUp   = pct > 0
@@ -663,25 +693,36 @@ function DeltaPill({ pct }) {
 
 // ─── Proactieve signalen (samengevoegd) ───────────────────────────────────────
 
-function ProactiveSignals({ plateaus, imbalances, topPRs, onNavigate }) {
-  const hasData = (plateaus || imbalances || topPRs) !== null
+function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
+  const hasData = (plateaus || topPRs) !== null
 
+  // PRs gefilterd op de laatste 4 workouts
+  const last4Dates = new Set((recentWorkouts ?? []).slice(0, 4).map((w) => w.start_date))
   const recentPRs = topPRs
-    ? topPRs.filter((pr) => pr.oneRepMax?.isRecent)
+    ? topPRs.filter((pr) => pr.oneRepMax?.date && last4Dates.has(pr.oneRepMax.date))
     : []
 
-  const signalCount =
-    (plateaus?.length ?? 0) +
-    (imbalances?.length ?? 0) +
-    recentPRs.length
+  const signalCount = (plateaus?.length ?? 0) + recentPRs.length
 
   if (!hasData || signalCount === 0) return null
 
   return (
-    <div className="surface rounded-xl p-plate-3">
-      <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
-        Signalen
-      </p>
+    <div className="surface rounded-xl p-plate-3" style={{ position: 'relative' }}>
+      {/* Header met icon */}
+      <div className="flex items-center justify-between mb-plate-2">
+        <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)]">
+          Signalen
+        </p>
+        <div style={{
+          width: 24, height: 24, borderRadius: 6,
+          background: 'rgba(217,164,65,0.12)',
+          color: '#D9A441',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <i className="ti ti-bell-ringing" style={{ fontSize: 13 }} aria-hidden="true" />
+        </div>
+      </div>
+
       <div className="flex flex-col">
 
         {/* Plateaus */}
@@ -704,46 +745,51 @@ function ProactiveSignals({ plateaus, imbalances, topPRs, onNavigate }) {
           </button>
         ))}
 
-        {/* Imbalances */}
-        {imbalances && imbalances.slice(0, 2).map((im) => (
-          <button
-            key={im.muscle_group}
-            onClick={() => onNavigate('volume')}
-            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
-          >
-            <div className="flex items-center gap-plate-2">
-              <SignalIcon type={im.status === 'low' ? 'danger' : 'warn'} icon="activity" />
-              <div>
-                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)] capitalize">{im.muscle_group}</p>
-                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  {im.setCount} sets · {im.status === 'low' ? `min ${im.min}` : `max ${im.max}`} sets/week
-                </p>
-              </div>
-            </div>
-            <SignalBadge
-              label={im.status === 'low' ? `−${Math.round(im.min - im.setCount)} sets` : `+${Math.round(im.setCount - im.max)} sets`}
-              color={im.status === 'low' ? 'danger' : 'warn'}
-            />
-          </button>
-        ))}
-
-        {/* Recente PRs */}
-        {recentPRs.slice(0, 2).map((pr) => (
+        {/* PRs — feestelijk en prominent */}
+        {recentPRs.slice(0, 3).map((pr) => (
           <button
             key={pr.exercise_title}
             onClick={() => onNavigate('prs')}
             className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
           >
             <div className="flex items-center gap-plate-2">
-              <SignalIcon type="ok" icon="trophy" />
+              {/* Gouden trophy */}
+              <div style={{
+                width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                background: 'linear-gradient(135deg, rgba(255,196,0,0.18), rgba(255,140,0,0.12))',
+                border: '1px solid rgba(255,184,0,0.28)',
+                color: '#FFB800',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <i className="ti ti-trophy" style={{ fontSize: 16 }} aria-hidden="true" />
+              </div>
               <div>
-                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{pr.exercise_title}</p>
+                <p className="font-[var(--font-body)] text-sm font-semibold text-[var(--color-text-primary)]">
+                  {pr.exercise_title}
+                </p>
                 <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  Geschat 1RM {formatKg(pr.oneRepMax.value)} kg
+                  e1RM{' '}
+                  <span style={{ color: '#FFB800', fontWeight: 700 }}>
+                    {formatKg(pr.oneRepMax.value)} kg
+                  </span>
+                  {' · '}
+                  {pr.oneRepMax.weight_kg} kg × {pr.oneRepMax.reps} reps
                 </p>
               </div>
             </div>
-            <SignalBadge label="Nieuw PR" color="ok" />
+            <span style={{
+              background: 'linear-gradient(135deg, #FFB800, #FF8C00)',
+              color: 'white',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              fontWeight: 700,
+              padding: '3px 7px',
+              borderRadius: 4,
+              letterSpacing: '0.06em',
+              flexShrink: 0,
+            }}>
+              PR ✦
+            </span>
           </button>
         ))}
 
@@ -791,60 +837,6 @@ function rankTopPRs(allPRs, n) {
     .slice(0, n)
 }
 
-// ─── Dagstrip ─────────────────────────────────────────────────────────────────
-
-function DayStrip({ days, onNavigate }) {
-  return (
-    <div className="grid grid-cols-7 gap-plate-1">
-      {days.map((d) => {
-        const dayNum  = Number(d.date.slice(8, 10))
-        const weekday = WEEKDAY_SHORT[new Date(d.date + 'T00:00:00').getDay()]
-
-        let bg = 'bg-[var(--color-bg)]'
-        let label = 'rust'
-        let labelColor = 'text-[var(--color-text-tertiary)]'
-
-        if (d.info?.type === 'done') {
-          bg = 'bg-[var(--color-status-ok)]/[0.1]'
-          label = d.info.title
-          labelColor = 'text-[var(--color-status-ok)]'
-        } else if (d.info?.type === 'planned') {
-          if (d.info.status === 'missed') {
-            bg = 'bg-[var(--color-status-high)]/[0.1]'
-            label = 'gemist'
-            labelColor = 'text-[var(--color-status-high)]'
-          } else if (d.info.status === 'skipped') {
-            bg = 'bg-[var(--color-bg)] opacity-60'
-            label = 'overgeslagen'
-            labelColor = 'text-[var(--color-text-tertiary)]'
-          } else {
-            bg = 'bg-[var(--color-data)]/[0.1]'
-            label = d.info.title
-            labelColor = 'text-[var(--color-data)]'
-          }
-        }
-
-        return (
-          <button
-            key={d.date}
-            onClick={() => onNavigate('agenda')}
-            className={`rounded-lg p-plate-1 flex flex-col items-center gap-0.5 border border-[var(--color-border-subtle)] transition-all hover:border-[var(--color-border)] hover:brightness-125 ${bg} ${
-              d.isToday ? 'ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-card)]' : ''
-            }`}
-          >
-            <span className="text-[9px] font-[var(--font-mono)] text-[var(--color-text-tertiary)]">{weekday}</span>
-            <span className={`text-xs font-[var(--font-mono)] ${d.isToday ? 'text-[var(--color-accent)] font-bold' : 'text-[var(--color-text-secondary)]'}`}>
-              {dayNum}
-            </span>
-            <span className={`text-[8px] font-[var(--font-body)] truncate w-full text-center ${labelColor}`}>
-              {label}
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 // ─── Upload (klein, onderaan) ─────────────────────────────────────────────────
 
