@@ -36,12 +36,44 @@
   --spacing-plate-7: 100px;
 }
 
+/* Fallback voor production builds waarbij @theme niet wordt verwerkt */
+:root {
+  --color-bg: #15171A;
+  --color-card: #1E2125;
+  --color-card-raised: #23262B;
+  --color-border: #2C3036;
+  --color-border-subtle: #232629;
+
+  --color-text-primary: #EDEEF0;
+  --color-text-secondary: #9499A1;
+  --color-text-tertiary: #686D75;
+
+  --color-accent: #FF4B3E;
+  --color-accent-dim: #B23B32;
+  --color-data: #3E7CB1;
+  --color-data-dim: #2C5A82;
+
+  --color-status-low: #D9A441;
+  --color-status-high: #FF4B3E;
+  --color-status-ok: #22C55E;
+
+  --font-display: 'Fraunces', serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --spacing-plate-1: 5px;
+  --spacing-plate-2: 10px;
+  --spacing-plate-3: 20px;
+  --spacing-plate-4: 40px;
+  --spacing-plate-5: 60px;
+  --spacing-plate-6: 80px;
+  --spacing-plate-7: 100px;
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   font-family: var(--font-body);
-  /* Zeer subtiele radiale gloed, alsof er één werklamp boven de pagina hangt
-     — geeft diepte zonder van de donkere, ingetogen basis af te wijken. */
   background-image: radial-gradient(
     ellipse 1200px 600px at 50% -10%,
     rgba(62, 124, 177, 0.05),
@@ -50,14 +82,11 @@ body {
   background-attachment: fixed;
 }
 
-/* Tabellaire cijfers: gewicht/reps/RPE lijnen uit als in een fysiek logboek */
 .tabular-data {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Standaardkaart: gestaalde rand + zachte gradient + lift-schaduw.
-   Vervangt platte --color-card vlakken door iets met materiaal. */
 .surface {
   background: linear-gradient(180deg, var(--color-card-raised) 0%, var(--color-card) 100%);
   border: 1px solid var(--color-border-subtle);
@@ -71,9 +100,6 @@ body {
   border: 1px solid var(--color-border-subtle);
 }
 
-/* Signature element: geladen kopbalk op sessiekaarten. De breedte
-   (via --load-pct, 0-100) representeert het volume van die sessie t.o.v.
-   het zwaarste punt in de getoonde set. Geen halter-icoon, een echte balk. */
 .loaded-bar {
   height: 3px;
   background: var(--color-border);
@@ -89,9 +115,6 @@ body {
   transition: width 0.6s ease-out;
 }
 
-/* Geslepen-staal hero-oppervlak: gereserveerd voor het ene signature-moment
-   per scherm (Home-hero, AI-analysekaart). Subtiele diagonale lichtstreep,
-   alsof licht over een metalen plaat valt. */
 .surface-hero {
   position: relative;
   background:
@@ -115,7 +138,6 @@ body {
   pointer-events: none;
 }
 
-/* Weekvolume-balken: vullen zich bij laden van het dashboard. */
 @keyframes fill-bar {
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
@@ -125,7 +147,6 @@ body {
   animation: fill-bar 0.5s ease-out;
 }
 
-/* Korte pulse op de AI-analysekaart zodra een nieuwe analyse klaar is. */
 @keyframes pulse-once {
   0% { box-shadow: 0 0 0 0 rgba(255, 75, 62, 0.5); }
   100% { box-shadow: 0 0 0 12px rgba(255, 75, 62, 0); }
