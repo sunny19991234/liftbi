@@ -25,10 +25,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - run: npm ci
+
+      - name: Pre-build Tailwind CSS
+        run: |
+          npx --yes @tailwindcss/cli@latest -i ./src/index.css -o ./src/index.compiled.css
+          sed -i "s|import './index.css'|import './index.compiled.css'|" ./src/main.jsx
 
       - name: Build
         run: npx vite build --base=/liftbi/
