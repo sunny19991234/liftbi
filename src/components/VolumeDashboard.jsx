@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { fetchStatsForPeriod } from '../lib/statsData'
+import { fetchDeloadWeeks } from '../lib/deloadData'
 
 // ─── Constanten ───────────────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ function MetricSelector({ metrics, value, onChange, accentColor = '#FF4B3E' }) {
 // Alleen huidige week (laatste balk) gearceerd. Geen groen voor beste week.
 // Bij veel weken (all time): horizontaal scrollbaar, smalle balken.
 
-function HeroWeeklyBars({ weeklyData, metric = 'volumeKg' }) {
+function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
   const values    = weeklyData.map(w => (w[metric] ?? 0))
   const max       = Math.max(...values, 1)
   const lastIdx   = weeklyData.length - 1
@@ -160,9 +161,18 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg' }) {
         }}
       >
         {weeklyData.map((w, i) => {
-          const v      = values[i]
-          const barH   = v > 0 ? Math.max(4, Math.round((v / max) * BAR_MAX)) : 0
-          const isLast = i === lastIdx
+          const v        = values[i]
+          const barH     = v > 0 ? Math.max(4, Math.round((v / max) * BAR_MAX)) : 0
+          const isLast   = i === lastIdx
+          const isDeload = deloadWeekSet?.has(w.weekStart)
+
+          const barColor = isDeload
+            ? (isLast ? '#D9A441' : 'rgba(217,164,65,0.40)')
+            : (isLast ? '#FF4B3E' : '#FF4B3E50')
+
+          const labelColor = isDeload
+            ? '#D9A441'
+            : isLast ? '#FF4B3E' : 'var(--color-text-secondary)'
 
           return (
             <div
@@ -178,21 +188,20 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg' }) {
               <div
                 style={{
                   width: '100%', height: barH, minHeight: v > 0 ? 4 : 0,
-                  background: isLast ? '#FF4B3E' : '#FF4B3E50',
+                  background: barColor,
                   borderRadius: '3px 3px 0 0',
                 }}
               />
-              {/* Weeknummer label alleen tonen als er genoeg ruimte is */}
               {(!manyWeeks || isLast) && (
                 <span
                   className="font-[var(--font-mono)] text-[8px] font-medium"
                   style={{
-                    color:   isLast ? '#FF4B3E' : 'var(--color-text-secondary)',
-                    opacity: isLast ? 1 : 0.5,
+                    color:   labelColor,
+                    opacity: isLast || isDeload ? 1 : 0.5,
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  W{w.weekNum}
+                  {isDeload && !manyWeeks ? '🌙' : `W${w.weekNum}`}
                 </span>
               )}
             </div>
@@ -205,7 +214,7 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg' }) {
 
 // ─── Overall stats hero ───────────────────────────────────────────────────────
 
-function OverallStatsHero({ overall, loading, weeksBack }) {
+function OverallStatsHero({ overall, loading, weeksBack, deloadWeekSet }) {
   const [heroMetric, setHeroMetric] = useState('volumeKg')
   const periodLabel = PERIODS.find(p => p.weeks === weeksBack)?.label ?? `${weeksBack} weken`
 
@@ -277,7 +286,7 @@ function OverallStatsHero({ overall, loading, weeksBack }) {
                 accentColor="#FF4B3E"
               />
             </div>
-            <HeroWeeklyBars weeklyData={weeklyData} metric={heroMetric} />
+            <HeroWeeklyBars weeklyData={weeklyData} metric={heroMetric} deloadWeekSet={deloadWeekSet} />
           </>
         )}
 
@@ -330,7 +339,7 @@ function MiniSparkline({ weeklyData, color, height = 20, width = 52 }) {
 
 // ─── Wekelijkse barchart voor spiergroep uitklap ─────────────────────────────
 
-function WeeklyBars({ weeklyData, metric, color }) {
+function WeeklyBars({ weeklyData, metric, color, deloadWeekSet }) {
   const values    = weeklyData.map(w => (w[metric] ?? 0))
   const max       = Math.max(...values, 1)
   const avg       = values.reduce((s, v) => s + v, 0) / values.length
@@ -345,10 +354,20 @@ function WeeklyBars({ weeklyData, metric, color }) {
       </p>
       <div className="flex items-end gap-1.5">
         {weeklyData.map((w, i) => {
-          const v      = w[metric] ?? 0
-          const barH   = v > 0 ? Math.max(6, Math.round((v / max) * BAR_MAX)) : 0
-          const isLast = i === weeklyData.length - 1
-          const above  = v >= avg
+          const v        = w[metric] ?? 0
+          const barH     = v > 0 ? Math.max(6, Math.round((v / max) * BAR_MAX)) : 0
+          const isLast   = i === weeklyData.length - 1
+          const above    = v >= avg
+          const isDeload = deloadWeekSet?.has(w.weekStart)
+
+          const barBg = isDeload
+            ? (isLast ? 'rgba(217,164,65,0.65)' : 'rgba(217,164,65,0.30)')
+            : (isLast ? color : above ? `${color}80` : `${color}40`)
+
+          const labelColor = isDeload
+            ? '#D9A441'
+            : isLast ? color : 'var(--color-text-secondary)'
+
           return (
             <div
               key={i}
@@ -361,7 +380,7 @@ function WeeklyBars({ weeklyData, metric, color }) {
               {showLabels && v > 0 && (
                 <span
                   className="font-[var(--font-mono)] text-[7px] leading-none whitespace-nowrap"
-                  style={{ color: isLast ? color : 'var(--color-text-secondary)', opacity: isLast ? 1 : 0.6 }}
+                  style={{ color: isDeload ? '#D9A441' : isLast ? color : 'var(--color-text-secondary)', opacity: isLast || isDeload ? 1 : 0.6 }}
                 >
                   {metaDef?.fmt(v)}
                 </span>
@@ -369,15 +388,15 @@ function WeeklyBars({ weeklyData, metric, color }) {
               <div
                 style={{
                   width: '100%', height: barH, minHeight: v > 0 ? 6 : 0,
-                  background: isLast ? color : above ? `${color}80` : `${color}40`,
+                  background: barBg,
                   borderRadius: '3px 3px 0 0',
                 }}
               />
               <span
                 className="font-[var(--font-mono)] text-[8px]"
-                style={{ color: isLast ? color : 'var(--color-text-secondary)', fontWeight: isLast ? 600 : 400 }}
+                style={{ color: labelColor, fontWeight: isLast || isDeload ? 600 : 400 }}
               >
-                {w.weekLabel}
+                {isDeload ? '🌙' : w.weekLabel}
               </span>
             </div>
           )
@@ -389,7 +408,7 @@ function WeeklyBars({ weeklyData, metric, color }) {
 
 // ─── Spiergroep rij (opklapbaar) ─────────────────────────────────────────────
 
-function MuscleGroupRow({ data, isSelected, onSelect }) {
+function MuscleGroupRow({ data, isSelected, onSelect, deloadWeekSet }) {
   const [metric, setMetric] = useState('volumeKg')
   const { muscleGroup, volumeKg, setCount, repCount, avgRpe, weeklyData } = data
   const color = getMgColor(muscleGroup)
@@ -459,7 +478,7 @@ function MuscleGroupRow({ data, isSelected, onSelect }) {
             />
           </div>
 
-          <WeeklyBars weeklyData={weeklyData} metric={metric} color={color} />
+          <WeeklyBars weeklyData={weeklyData} metric={metric} color={color} deloadWeekSet={deloadWeekSet} />
 
         </div>
       )}
@@ -469,7 +488,7 @@ function MuscleGroupRow({ data, isSelected, onSelect }) {
 
 // ─── Spiergroep sectie ────────────────────────────────────────────────────────
 
-function MuscleGroupSection({ byMuscleGroup }) {
+function MuscleGroupSection({ byMuscleGroup, deloadWeekSet }) {
   const [selected, setSelected] = useState(null)
 
   if (!byMuscleGroup.length) return null
@@ -486,6 +505,7 @@ function MuscleGroupSection({ byMuscleGroup }) {
             data={mg}
             isSelected={selected === mg.muscleGroup}
             onSelect={() => setSelected(selected === mg.muscleGroup ? null : mg.muscleGroup)}
+            deloadWeekSet={deloadWeekSet}
           />
         ))}
       </div>
@@ -496,18 +516,28 @@ function MuscleGroupSection({ byMuscleGroup }) {
 // ─── Hoofd export ─────────────────────────────────────────────────────────────
 
 export default function VolumeDashboard() {
-  const [weeksBack, setWeeksBack] = useState(4)
-  const [stats,     setStats]     = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
+  const [weeksBack,   setWeeksBack]   = useState(4)
+  const [stats,       setStats]       = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState(null)
+  const [deloadWeeks, setDeloadWeeks] = useState([])
 
   useEffect(() => {
     setLoading(true)
     setStats(null)
-    fetchStatsForPeriod(weeksBack)
-      .then(data => { setStats(data); setLoading(false) })
+    Promise.all([
+      fetchStatsForPeriod(weeksBack),
+      fetchDeloadWeeks(),
+    ])
+      .then(([data, dlWeeks]) => {
+        setStats(data)
+        setDeloadWeeks(dlWeeks)
+        setLoading(false)
+      })
       .catch(err => { setError(err.message); setLoading(false) })
   }, [weeksBack])
+
+  const deloadWeekSet = new Set(deloadWeeks)
 
   if (error) {
     return (
@@ -527,10 +557,15 @@ export default function VolumeDashboard() {
         <PeriodSelector value={weeksBack} onChange={setWeeksBack} />
       </div>
 
-      <OverallStatsHero overall={stats?.overall ?? null} loading={loading} weeksBack={weeksBack} />
+      <OverallStatsHero
+        overall={stats?.overall ?? null}
+        loading={loading}
+        weeksBack={weeksBack}
+        deloadWeekSet={deloadWeekSet}
+      />
 
       {!loading && stats && (
-        <MuscleGroupSection byMuscleGroup={stats.byMuscleGroup} />
+        <MuscleGroupSection byMuscleGroup={stats.byMuscleGroup} deloadWeekSet={deloadWeekSet} />
       )}
 
     </div>

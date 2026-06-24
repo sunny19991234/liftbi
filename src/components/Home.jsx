@@ -32,6 +32,7 @@ import {
 } from '../lib/coachAdvice'
 import { parseHevyCsv } from '../lib/hevyParser'
 import { getToken, clearToken } from '../lib/auth'
+import { fetchDeloadWeeks, getWeeksSinceDeload } from '../lib/deloadData'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 
@@ -102,6 +103,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
   const [bestWeek, setBestWeek]               = useState(null) // { bestWeekVolume, pct }
   const [recentWorkouts, setRecentWorkouts]   = useState(null)
   const [upcomingPlanned, setUpcomingPlanned] = useState(null)
+  const [deloadWeeks, setDeloadWeeks]         = useState([])
   const [error, setError]                     = useState(null)
 
   const today = getTodayStr()
@@ -113,7 +115,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setNextPlanned(next)
 
       // Daarna alles parallel, readiness nu met het juiste workout-type
-      const [strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData, recentWos, upcomingWos] =
+      const [strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData, recentWos, upcomingWos, dlWeeks] =
         await Promise.all([
           fetchDayStrip(),
           fetchWeekVolume(),
@@ -125,6 +127,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
           calculateStreak(3),
           fetchRecentWorkouts(5),
           fetchUpcomingPlanned(4),
+          fetchDeloadWeeks(),
         ])
 
       setDayStrip(strip)
@@ -137,6 +140,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setStreak(streakData)
       setRecentWorkouts(recentWos)
       setUpcomingPlanned(upcomingWos)
+      setDeloadWeeks(dlWeeks)
 
       fetchBestWeekComparison(vol.volumeKg).then(setBestWeek).catch(() => {})
       loadCoachAdvice(next)
@@ -177,8 +181,16 @@ export default function Home({ onNavigate, onTokenExpired }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const todayInfo    = dayStrip?.find((d) => d.isToday)?.info
+  const todayInfo      = dayStrip?.find((d) => d.isToday)?.info
   const todayIsRestDay = dayStrip && !todayInfo
+
+  // Deload-afleiding
+  const deloadSet         = new Set(deloadWeeks)
+  const currentWeekStart  = weekVolume?.weekStart ?? null
+  const prevWeekStart     = prevWeekVolume?.weekStart ?? null
+  const isCurrentDeload   = currentWeekStart ? deloadSet.has(currentWeekStart) : false
+  const isPrevDeload      = prevWeekStart ? deloadSet.has(prevWeekStart) : false
+  const { weeksSince: weeksSinceDeload } = getWeeksSinceDeload(deloadWeeks)
 
   if (error) {
     return <p className="text-[var(--color-status-high)] p-plate-4 font-[var(--font-body)]">Fout: {error}</p>
@@ -186,6 +198,9 @@ export default function Home({ onNavigate, onTokenExpired }) {
 
   return (
     <div className="max-w-3xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col gap-plate-3">
+
+      {/* Deload banner — alleen zichtbaar tijdens deload week */}
+      {isCurrentDeload && <DeloadBanner />}
 
       {/* 1. Readiness hero */}
       <ReadinessHero
@@ -196,6 +211,8 @@ export default function Home({ onNavigate, onTokenExpired }) {
         streak={streak}
         recentWorkouts={recentWorkouts}
         upcomingPlanned={upcomingPlanned}
+        isCurrentDeload={isCurrentDeload}
+        weeksSinceDeload={weeksSinceDeload}
         onNavigate={onNavigate}
       />
 
@@ -211,15 +228,18 @@ export default function Home({ onNavigate, onTokenExpired }) {
           weekVolume={weekVolume}
           prevWeekVolume={prevWeekVolume}
           bestWeek={bestWeek}
+          isCurrentDeload={isCurrentDeload}
+          isPrevDeload={isPrevDeload}
           onNavigate={onNavigate}
         />
       </div>
 
-      {/* 4. Proactieve signalen */}
+      {/* 4. Proactieve signalen — plateau en disbalans gedempt tijdens deload */}
       <ProactiveSignals
         plateaus={plateaus}
         topPRs={topPRs}
         recentWorkouts={recentWorkouts}
+        isDeload={isCurrentDeload}
         onNavigate={onNavigate}
       />
 
@@ -230,9 +250,43 @@ export default function Home({ onNavigate, onTokenExpired }) {
   )
 }
 
+// ─── Deload banner ────────────────────────────────────────────────────────────
+
+function DeloadBanner() {
+  return (
+    <div
+      className="rounded-xl flex items-center gap-3 px-plate-3 py-plate-3"
+      style={{
+        background: 'rgba(217,164,65,0.10)',
+        border: '1px solid rgba(217,164,65,0.30)',
+      }}
+    >
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+        background: 'rgba(217,164,65,0.18)',
+        border: '1px solid rgba(217,164,65,0.40)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#D9A441',
+      }}>
+        <i className="ti ti-moon-stars" style={{ fontSize: 19 }} aria-hidden="true" />
+      </div>
+      <div>
+        <p className="font-[var(--font-display)] font-semibold text-base leading-tight"
+          style={{ color: '#D9A441' }}>
+          Deload week
+        </p>
+        <p className="font-[var(--font-mono)] text-[10px] mt-0.5"
+          style={{ color: 'rgba(217,164,65,0.7)' }}>
+          Actief herstel · disbalans & plateau meldingen gedempt
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Readiness hero ───────────────────────────────────────────────────────────
 
-function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, streak, recentWorkouts, upcomingPlanned, onNavigate }) {
+function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, streak, recentWorkouts, upcomingPlanned, isCurrentDeload, weeksSinceDeload, onNavigate }) {
   const score  = readiness?.score ?? null
   const color  = score !== null ? readinessColor(score) : '#9499A1'
   const radius = 22
@@ -299,7 +353,12 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
     if (diff > 4) break
     mesoItems.push({ title: p.title, diff, isPast: false, isNext: true })
   }
-  const mesoWeek = Math.max(1, streak?.weeks ?? 1)
+  // Week-teller: na deload opnieuw beginnen, of deload tonen
+  const mesoWeek = isCurrentDeload
+    ? null
+    : weeksSinceDeload !== null
+      ? weeksSinceDeload
+      : Math.max(1, streak?.weeks ?? 1)
 
   // Dynamisch icon op basis van readiness score
   const heroIcon = score === null ? 'barbell' : score >= 8 ? 'flame' : score >= 6 ? 'bolt' : 'moon'
@@ -378,18 +437,34 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
       {mesoItems.length > 0 && (
         <div className="border-t border-[var(--color-border-subtle)] px-plate-3 py-2.5">
           <div className="flex items-center justify-between mb-2">
-            <span
-              className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em]"
-              style={{
-                color: 'var(--color-accent)',
-                background: 'var(--color-accent)14',
-                border: '1px solid var(--color-accent)28',
-                borderRadius: 3,
-                padding: '2px 6px',
-              }}
-            >
-              Week {mesoWeek}
-            </span>
+            {isCurrentDeload ? (
+              <span
+                className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em] flex items-center gap-1"
+                style={{
+                  color: '#D9A441',
+                  background: 'rgba(217,164,65,0.12)',
+                  border: '1px solid rgba(217,164,65,0.30)',
+                  borderRadius: 3,
+                  padding: '2px 6px',
+                }}
+              >
+                <i className="ti ti-moon-stars" style={{ fontSize: 9 }} />
+                Deload
+              </span>
+            ) : (
+              <span
+                className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em]"
+                style={{
+                  color: 'var(--color-accent)',
+                  background: 'var(--color-accent)14',
+                  border: '1px solid var(--color-accent)28',
+                  borderRadius: 3,
+                  padding: '2px 6px',
+                }}
+              >
+                Week {mesoWeek}
+              </span>
+            )}
           </div>
           <div className="flex items-end overflow-x-auto gap-0" style={{ scrollbarWidth: 'none' }}>
             {mesoItems.map((item, i) => {
@@ -630,7 +705,7 @@ function AdviceRow({ advice }) {
 
 // ─── Week vs beste week ───────────────────────────────────────────────────────
 
-function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }) {
+function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDeload, isPrevDeload, onNavigate }) {
   const loaded = weekVolume !== null
   const isEmptyWeek = weekVolume && weekVolume.volumeKg === 0 && weekVolume.setCount === 0
 
@@ -639,7 +714,8 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
     return Math.round(((current - previous) / previous) * 100)
   }
 
-  const volDelta = loaded && !isEmptyWeek && prevWeekVolume
+  // Geen delta vergelijking als huidige of vorige week een deload is
+  const volDelta = loaded && !isEmptyWeek && prevWeekVolume && !isCurrentDeload && !isPrevDeload
     ? delta(weekVolume.volumeKg, prevWeekVolume.volumeKg)
     : null
 
@@ -647,16 +723,29 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
     <button
       onClick={() => onNavigate('volume')}
       className="surface text-left rounded-xl px-3 py-2 hover:brightness-110 transition-all w-full h-full"
-      style={{ position: 'relative' }}
+      style={{
+        position: 'relative',
+        border: isCurrentDeload ? '1px solid rgba(217,164,65,0.25)' : undefined,
+      }}
     >
       {/* Icon rechtsboven */}
       <div style={{ position: 'absolute', top: 8, right: 10 }}>
-        <i className="ti ti-chart-bar" style={{ fontSize: 15, color: 'var(--color-accent)', opacity: 0.6 }} aria-hidden="true" />
+        <i className="ti ti-chart-bar" style={{ fontSize: 15, color: isCurrentDeload ? '#D9A441' : 'var(--color-accent)', opacity: 0.6 }} aria-hidden="true" />
       </div>
 
-      <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-1.5">
-        Week
-      </p>
+      {/* Header met optionele deload badge */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)]">
+          Week
+        </p>
+        {isCurrentDeload && (
+          <span className="font-[var(--font-mono)] text-[8px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
+            style={{ background: 'rgba(217,164,65,0.15)', color: '#D9A441', border: '1px solid rgba(217,164,65,0.3)' }}>
+            <i className="ti ti-moon-stars" style={{ fontSize: 8 }} />
+            deload
+          </span>
+        )}
+      </div>
 
       {!weekVolume ? (
         <p className="font-[var(--font-mono)] text-sm text-[var(--color-text-secondary)]">Laden...</p>
@@ -670,10 +759,11 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
           </p>
         </div>
       ) : (
-        <>
+        <div style={{ opacity: isCurrentDeload ? 0.7 : 1 }}>
           {/* Huidige week */}
           <div className="mb-0.5">
-            <span className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-accent)] leading-none">
+            <span className="font-[var(--font-display)] font-semibold text-xl leading-none"
+              style={{ color: isCurrentDeload ? '#D9A441' : 'var(--color-accent)' }}>
               {formatKg(weekVolume.volumeKg)}
             </span>
             <span className="font-[var(--font-body)] text-[9px] text-[var(--color-text-secondary)] ml-1">kg</span>
@@ -697,7 +787,14 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
                 <span className="font-[var(--font-mono)] text-[8px] uppercase tracking-wide text-[var(--color-text-secondary)]">
                   vorige
                 </span>
-                {volDelta !== null && <DeltaPill pct={volDelta} />}
+                {isPrevDeload ? (
+                  <span className="font-[var(--font-mono)] text-[8px] px-1.5 py-0.5 rounded"
+                    style={{ background: 'rgba(217,164,65,0.12)', color: '#D9A441bb', border: '1px solid rgba(217,164,65,0.2)' }}>
+                    deload
+                  </span>
+                ) : volDelta !== null ? (
+                  <DeltaPill pct={volDelta} />
+                ) : null}
               </div>
               <div className="font-[var(--font-mono)] text-[11px] text-[var(--color-text-secondary)]">
                 {formatKg(prevWeekVolume.volumeKg)} kg
@@ -720,8 +817,8 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
             </div>
           )}
 
-          {/* vs beste week — verborgen bij 0% */}
-          {bestWeek && bestWeek.pct > 0 && (
+          {/* vs beste week — verborgen bij deload of 0% */}
+          {!isCurrentDeload && bestWeek && bestWeek.pct > 0 && (
             <div>
               <div style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--color-border)', overflow: 'hidden' }}>
                 <div style={{
@@ -738,7 +835,7 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, onNavigate }
               </span>
             </div>
           )}
-        </>
+        </div>
       )}
     </button>
   )
@@ -764,7 +861,7 @@ function DeltaPill({ pct }) {
 
 // ─── Proactieve signalen (samengevoegd) ───────────────────────────────────────
 
-function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
+function ProactiveSignals({ plateaus, topPRs, recentWorkouts, isDeload, onNavigate }) {
   const hasData = (plateaus || topPRs) !== null
 
   // PRs gefilterd op de laatste 4 workouts
@@ -773,7 +870,9 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
     ? topPRs.filter((pr) => pr.oneRepMax?.date && last4Dates.has(pr.oneRepMax.date))
     : []
 
-  const signalCount = (plateaus?.length ?? 0) + recentPRs.length
+  // Tijdens deload: plateau-meldingen dempen (gewicht is bewust lager)
+  const visiblePlateaus = isDeload ? [] : (plateaus ?? [])
+  const signalCount = visiblePlateaus.length + recentPRs.length
 
   if (!hasData || signalCount === 0) return null
 
@@ -796,8 +895,8 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, onNavigate }) {
 
       <div className="flex flex-col">
 
-        {/* Plateaus */}
-        {plateaus && plateaus.slice(0, 2).map((p) => (
+        {/* Plateaus — gedempt tijdens deload */}
+        {visiblePlateaus.slice(0, 2).map((p) => (
           <button
             key={p.exercise_title}
             onClick={() => onNavigate('rpe')}

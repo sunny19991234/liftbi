@@ -7,10 +7,15 @@
 // Signature-element: uitgevoerde dagen krijgen een "loaded bar" -- een
 // dunne kopbalk waarvan de breedte het volume van die sessie representeert
 // t.o.v. de zwaarste sessie in de zichtbare maand.
+//
+// Deload weken: elke week-rij heeft een maanknopje aan de linkerkant.
+// Klik = toggle deload. Deload weken krijgen een amber achtergrond-tint.
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchMonthData, getTodayStr } from '../lib/calendarData'
+import { fetchDeloadWeeks, toggleDeloadWeek } from '../lib/deloadData'
+import { getWeekStart } from '../lib/dashboardQueries'
 
 const ROUTINE_TITLES = ['Push', 'Pull', 'Legs', 'Upper']
 const WEEKDAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -37,6 +42,12 @@ function buildCalendarGrid(year, month) {
   return weeks
 }
 
+function getWeekStartForRow(week) {
+  const first = week.find(d => d !== null)
+  if (!first) return null
+  return getWeekStart(first)
+}
+
 export default function Agenda({ onViewSession }) {
   const today = getTodayStr()
   const [year, setYear] = useState(() => Number(today.slice(0, 4)))
@@ -44,11 +55,13 @@ export default function Agenda({ onViewSession }) {
   const [dayMap, setDayMap] = useState(null)
   const [error, setError] = useState(null)
   const [planDialogDate, setPlanDialogDate] = useState(null)
-  const [analysisPreview, setAnalysisPreview] = useState(null) // { title, start_date, summary, workoutId } | null
+  const [analysisPreview, setAnalysisPreview] = useState(null)
+  const [deloadWeeks, setDeloadWeeks] = useState([])
+  const [togglingWeek, setTogglingWeek] = useState(null)
 
   const weeks = useMemo(() => buildCalendarGrid(year, month), [year, month])
+  const deloadSet = useMemo(() => new Set(deloadWeeks), [deloadWeeks])
 
-  // Hoogste volume in de zichtbare maand -- basis voor de loaded-bar-schaal.
   const maxVolume = useMemo(() => {
     if (!dayMap) return 0
     let max = 0
@@ -60,8 +73,12 @@ export default function Agenda({ onViewSession }) {
 
   async function load() {
     try {
-      const data = await fetchMonthData(year, month)
+      const [data, dlWeeks] = await Promise.all([
+        fetchMonthData(year, month),
+        fetchDeloadWeeks(),
+      ])
       setDayMap(data)
+      setDeloadWeeks(dlWeeks)
     } catch (err) {
       setError(err.message)
     }
@@ -77,6 +94,24 @@ export default function Agenda({ onViewSession }) {
   }
   function goToNextMonth() {
     if (month === 12) { setYear(year + 1); setMonth(1) } else { setMonth(month + 1) }
+  }
+
+  async function handleToggleDeload(weekStart) {
+    if (togglingWeek) return
+    setTogglingWeek(weekStart)
+    try {
+      await toggleDeloadWeek(weekStart)
+      // Optimistische update: toggle lokaal zonder reload
+      setDeloadWeeks(prev =>
+        prev.includes(weekStart)
+          ? prev.filter(ws => ws !== weekStart)
+          : [...prev, weekStart].sort()
+      )
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setTogglingWeek(null)
+    }
   }
 
   async function handlePlanSubmit(title, notes) {
@@ -100,6 +135,7 @@ export default function Agenda({ onViewSession }) {
 
   return (
     <div className="max-w-4xl mx-auto p-plate-4 flex flex-col gap-plate-4">
+      {/* Header: maand + navigatie */}
       <div className="flex items-center justify-between">
         <h2 className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-text-primary)] tracking-tight capitalize">
           {MONTH_LABELS[month - 1]} {year}
@@ -120,28 +156,58 @@ export default function Agenda({ onViewSession }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-plate-1">
-        {WEEKDAY_LABELS.map((d) => (
-          <div key={d} className="text-center text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] pb-plate-1">
-            {d}
-          </div>
-        ))}
+      {/* Kalender grid */}
+      <div className="flex flex-col gap-1">
 
-        {!dayMap
-          ? <div className="col-span-7 text-center text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm py-plate-5">Laden...</div>
-          : weeks.flatMap((week, wi) =>
-              week.map((dateStr, di) => (
-                <DayCell
-                  key={`${wi}-${di}`}
-                  dateStr={dateStr}
-                  isToday={dateStr === today}
-                  info={dateStr ? dayMap.get(dateStr) : null}
-                  maxVolume={maxVolume}
-                  onPlanClick={() => setPlanDialogDate(dateStr)}
-                  onDoneClick={(info) => setAnalysisPreview({ ...info, date: dateStr })}
-                />
-              ))
-            )}
+        {/* Weekdag-kopregel (met spatiëring voor de toggle-kolom) */}
+        <div className="flex items-center gap-1">
+          <div style={{ width: 30, flexShrink: 0 }} />
+          {WEEKDAY_LABELS.map((d) => (
+            <div
+              key={d}
+              className="flex-1 text-center text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)] pb-1"
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Week-rijen */}
+        {!dayMap ? (
+          <div className="text-center text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm py-plate-5">
+            Laden...
+          </div>
+        ) : weeks.map((week, wi) => {
+          const weekStart = getWeekStartForRow(week)
+          const isDeload = weekStart ? deloadSet.has(weekStart) : false
+
+          return (
+            <div key={wi} className="flex items-stretch gap-1">
+              {/* Deload toggle knop */}
+              <WeekToggle
+                weekStart={weekStart}
+                isDeload={isDeload}
+                isLoading={togglingWeek === weekStart}
+                onToggle={() => weekStart && handleToggleDeload(weekStart)}
+              />
+
+              {/* 7 dagcellen */}
+              {week.map((dateStr, di) => (
+                <div key={di} className="flex-1 min-w-0">
+                  <DayCell
+                    dateStr={dateStr}
+                    isToday={dateStr === today}
+                    info={dateStr ? dayMap.get(dateStr) : null}
+                    maxVolume={maxVolume}
+                    isDeload={isDeload}
+                    onPlanClick={() => dateStr && setPlanDialogDate(dateStr)}
+                    onDoneClick={(info) => setAnalysisPreview({ ...info, date: dateStr })}
+                  />
+                </div>
+              ))}
+            </div>
+          )
+        })}
       </div>
 
       <Legend />
@@ -168,7 +234,44 @@ export default function Agenda({ onViewSession }) {
   )
 }
 
-function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }) {
+// ─── Deload toggle knop ────────────────────────────────────────────────────────
+
+function WeekToggle({ weekStart, isDeload, isLoading, onToggle }) {
+  if (!weekStart) {
+    return <div style={{ width: 30, flexShrink: 0 }} />
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={isLoading}
+      title={isDeload ? 'Deload week — tik om te verwijderen' : 'Markeer als deload week'}
+      className="flex items-center justify-center rounded-lg transition-all"
+      style={{
+        width: 30,
+        flexShrink: 0,
+        alignSelf: 'stretch',
+        minHeight: 44,
+        background: isDeload ? 'rgba(217,164,65,0.15)' : 'var(--color-card)',
+        border: `1px solid ${isDeload ? 'rgba(217,164,65,0.45)' : 'var(--color-border)'}`,
+        color: isDeload ? '#D9A441' : 'var(--color-text-secondary)',
+        opacity: isLoading ? 0.5 : isDeload ? 1 : 0.55,
+        cursor: isLoading ? 'wait' : 'pointer',
+      }}
+    >
+      <i
+        className={`ti ti-${isDeload ? 'moon-stars' : 'moon'}`}
+        style={{ fontSize: 12, display: 'block' }}
+        aria-hidden="true"
+      />
+    </button>
+  )
+}
+
+// ─── Dagcel ───────────────────────────────────────────────────────────────────
+
+function DayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick }) {
   if (!dateStr) {
     return <div className="aspect-square" />
   }
@@ -178,13 +281,22 @@ function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }
   const isDone = info?.type === 'done'
   const isClickable = isRestDay || isDone || (info?.type === 'planned' && info.status === 'planned')
 
-  let bgClasses = 'bg-[var(--color-card)]'
-  if (info?.type === 'done') bgClasses = 'bg-[var(--color-status-ok)]/[0.08]'
-  else if (info?.type === 'planned' && info.status === 'planned') bgClasses = 'bg-[var(--color-data)]/[0.08]'
-  else if (info?.type === 'planned' && info.status === 'missed') bgClasses = 'bg-[var(--color-status-high)]/[0.08]'
-  else if (info?.type === 'planned' && info.status === 'skipped') bgClasses = 'bg-[var(--color-card)] opacity-50'
+  // Achtergrond: deload geeft amber-tint bovenop de normale kleur
+  let bgStyle = {}
+  if (isDeload) {
+    if (info?.type === 'done') bgStyle = { background: 'rgba(217,164,65,0.13)' }
+    else if (info?.type === 'planned' && info.status === 'planned') bgStyle = { background: 'rgba(217,164,65,0.09)' }
+    else if (info?.type === 'planned' && info.status === 'missed') bgStyle = { background: 'rgba(217,164,65,0.09)' }
+    else bgStyle = { background: 'rgba(217,164,65,0.07)' }
+  } else {
+    if (info?.type === 'done') bgStyle = { background: 'rgba(34,197,94,0.08)' }
+    else if (info?.type === 'planned' && info.status === 'planned') bgStyle = { background: 'var(--color-data-bg, rgba(62,124,177,0.08))' }
+    else if (info?.type === 'planned' && info.status === 'missed') bgStyle = { background: 'rgba(255,75,62,0.08)' }
+    else if (info?.type === 'planned' && info.status === 'skipped') bgStyle = { background: 'var(--color-card)', opacity: 0.5 }
+    else bgStyle = { background: 'var(--color-card)' }
+  }
 
-  const loadPct = info?.type === 'done' && maxVolume > 0
+  const loadPct = isDone && maxVolume > 0
     ? Math.max(8, Math.round((info.volumeKg / maxVolume) * 100))
     : 0
 
@@ -197,25 +309,35 @@ function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }
     <button
       type="button"
       onClick={isClickable ? handleClick : undefined}
-      className={`aspect-square rounded-lg flex flex-col text-left relative overflow-hidden transition-colors ${bgClasses} ${
+      className={`aspect-square rounded-lg flex flex-col text-left relative overflow-hidden transition-colors w-full ${
         isToday ? 'ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-bg)]' : ''
       } ${isClickable ? 'cursor-pointer hover:brightness-125' : ''}`}
+      style={bgStyle}
     >
-      {info?.type === 'done' && (
-        <div className="loaded-bar" style={{ '--load-pct': `${loadPct}%` }} />
+      {/* Loaded bar bovenaan bij uitgevoerde sessie */}
+      {isDone && (
+        <div
+          className="loaded-bar"
+          style={{
+            '--load-pct': `${loadPct}%`,
+            background: isDeload ? 'rgba(217,164,65,0.6)' : undefined,
+          }}
+        />
       )}
 
       <div className="p-plate-1 flex-1 flex flex-col">
-        <span className={`text-xs font-[var(--font-mono)] ${isToday ? 'text-[var(--color-accent)] font-bold' : 'text-[var(--color-text-secondary)]'}`}>
+        <span className={`text-xs font-[var(--font-mono)] ${isToday ? 'text-[var(--color-accent)] font-bold' : isDeload ? '' : 'text-[var(--color-text-secondary)]'}`}
+          style={isDeload && !isToday ? { color: '#D9A441aa' } : {}}>
           {dayNum}
         </span>
 
-        {info?.type === 'done' && (
+        {isDone && (
           <div className="flex-1 flex flex-col justify-end gap-0.5">
             <span className="text-[10px] leading-tight font-[var(--font-body)] text-[var(--color-text-primary)] truncate">
               {info.title}
             </span>
-            <span className="text-[9px] leading-tight font-[var(--font-mono)] text-[var(--color-status-ok)] tabular-data">
+            <span className="text-[9px] leading-tight font-[var(--font-mono)] tabular-data"
+              style={{ color: isDeload ? '#D9A441' : 'var(--color-status-ok)' }}>
               {info.setCount} sets
             </span>
             <span className="text-[9px] leading-tight font-[var(--font-mono)] text-[var(--color-text-secondary)] tabular-data">
@@ -241,8 +363,9 @@ function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }
             <span className={`text-[10px] leading-tight font-[var(--font-body)] truncate ${
               info.status === 'skipped' ? 'text-[var(--color-text-secondary)] line-through'
               : info.status === 'missed' ? 'text-[var(--color-status-high)]'
-              : 'text-[var(--color-data)]'
-            }`}>
+              : isDeload ? '' : 'text-[var(--color-data)]'
+            }`}
+            style={isDeload && info.status !== 'skipped' && info.status !== 'missed' ? { color: '#D9A441' } : {}}>
               {info.title}
             </span>
             <span className={`text-[9px] leading-tight font-[var(--font-mono)] ${
@@ -255,15 +378,21 @@ function DayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }
 
         {isRestDay && (
           <div className="flex-1 flex items-center justify-center">
-            <span className="text-[9px] font-[var(--font-mono)] text-[var(--color-text-secondary)] opacity-40">
-              rust
-            </span>
+            {isDeload ? (
+              <i className="ti ti-moon" style={{ fontSize: 10, color: 'rgba(217,164,65,0.35)' }} aria-hidden="true" />
+            ) : (
+              <span className="text-[9px] font-[var(--font-mono)] text-[var(--color-text-secondary)] opacity-40">
+                rust
+              </span>
+            )}
           </div>
         )}
       </div>
     </button>
   )
 }
+
+// ─── Legenda ──────────────────────────────────────────────────────────────────
 
 function Legend() {
   const items = [
@@ -272,18 +401,28 @@ function Legend() {
     { color: 'bg-[var(--color-status-high)]/30', label: 'Gemist' },
     { color: 'bg-[var(--color-card)] opacity-50', label: 'Overgeslagen' },
     { color: 'bg-[var(--color-card)]', label: 'Rustdag' },
+    { isDeload: true, label: 'Deload week' },
   ]
   return (
     <div className="flex flex-wrap gap-plate-4">
       {items.map((it) => (
         <div key={it.label} className="flex items-center gap-plate-1">
-          <span className={`w-3 h-3 rounded ${it.color}`} />
+          {it.isDeload ? (
+            <span className="w-3 h-3 rounded flex items-center justify-center"
+              style={{ background: 'rgba(217,164,65,0.2)', border: '1px solid rgba(217,164,65,0.4)' }}>
+              <i className="ti ti-moon-stars" style={{ fontSize: 7, color: '#D9A441' }} />
+            </span>
+          ) : (
+            <span className={`w-3 h-3 rounded ${it.color}`} />
+          )}
           <span className="text-xs text-[var(--color-text-secondary)] font-[var(--font-body)]">{it.label}</span>
         </div>
       ))}
     </div>
   )
 }
+
+// ─── Analyse preview popup ────────────────────────────────────────────────────
 
 function AnalysisPreview({ info, onClose, onViewFull }) {
   return (
@@ -335,6 +474,8 @@ function AnalysisPreview({ info, onClose, onViewFull }) {
     </div>
   )
 }
+
+// ─── Plan sessie dialog ───────────────────────────────────────────────────────
 
 function PlanDialog({ date, onClose, onSubmit }) {
   const [title, setTitle] = useState(ROUTINE_TITLES[0])
