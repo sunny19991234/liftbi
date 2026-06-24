@@ -571,8 +571,20 @@ export default function ExerciseLibrary() {
   return (
     <div className="flex" style={{ height: 'calc(100vh - 6.5rem)' }}>
 
-      {/* Left: detail view */}
-      <div className="flex-1 overflow-y-auto min-w-0">
+      {/* Left: detail view — verborgen op mobiel als niks geselecteerd */}
+      <div className={`flex-1 overflow-y-auto min-w-0 flex flex-col ${selected ? '' : 'hidden sm:flex'}`}>
+        {/* Terugknop op mobiel */}
+        {selected && (
+          <div className="sm:hidden flex items-center px-3 py-2 border-b border-[#2A2D31]">
+            <button
+              onClick={() => setSelected(null)}
+              className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] font-[var(--font-body)] hover:text-[var(--color-text-primary)] transition-colors"
+            >
+              <i className="ti ti-arrow-left" style={{ fontSize: 14 }} />
+              Bibliotheek
+            </button>
+          </div>
+        )}
         {!selected ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-8">
             <div
@@ -620,10 +632,9 @@ export default function ExerciseLibrary() {
         )}
       </div>
 
-      {/* Right: library panel */}
+      {/* Right: library panel — verborgen op mobiel als een oefening geselecteerd is */}
       <div
-        className="w-[280px] shrink-0 flex flex-col"
-        style={{ borderLeft: '1px solid #2A2D31' }}
+        className={`shrink-0 flex flex-col sm:border-l sm:border-[#2A2D31] ${selected ? 'hidden sm:flex sm:w-[280px]' : 'flex w-full sm:w-[280px]'}`}
       >
         {/* Header */}
         <div

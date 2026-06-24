@@ -518,7 +518,7 @@ export default function VolumeDashboard() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-plate-4 flex flex-col gap-plate-4">
+    <div className="max-w-3xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col gap-plate-4">
 
       <div className="flex items-center justify-between">
         <h2 className="font-[var(--font-display)] font-semibold text-xl text-[var(--color-text-primary)] tracking-tight">

@@ -185,7 +185,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-plate-4 flex flex-col gap-plate-3">
+    <div className="max-w-3xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col gap-plate-3">
 
       {/* 1. Readiness hero */}
       <ReadinessHero
@@ -204,8 +204,8 @@ export default function Home({ onNavigate, onTokenExpired }) {
         <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
       )}
 
-      {/* 3. Streak + Weekstatistieken — naast elkaar */}
-      <div className="grid grid-cols-2 gap-plate-3">
+      {/* 3. Streak + Weekstatistieken — naast elkaar op desktop, gestapeld op mobiel */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-plate-3">
         {streak !== null && <StreakCard streak={streak} />}
         <WeekComparisonCard
           weekVolume={weekVolume}

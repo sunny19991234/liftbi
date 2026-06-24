@@ -147,7 +147,7 @@ export default function Workouts() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-plate-4 flex flex-col md:flex-row gap-plate-6 items-start">
+    <div className="max-w-6xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col md:flex-row gap-plate-4 sm:gap-plate-6 items-start">
 
       {/* ── Linkerkolom: kalender ─────────────────────────────── */}
       <div className="w-full md:w-72 flex-shrink-0 flex flex-col gap-plate-3">
