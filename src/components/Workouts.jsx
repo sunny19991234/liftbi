@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchMonthWorkoutsData } from '../lib/workoutsData'
 import { getTodayStr } from '../lib/calendarData'
+import { fetchDeloadWeeks, toggleDeloadWeek } from '../lib/deloadData'
+import { getWeekStart } from '../lib/dashboardQueries'
 
 // ─── Split kleurensysteem ─────────────────────────────────────────────────────
 
@@ -43,6 +45,12 @@ const MONTH_LABELS = [
   'juli', 'augustus', 'september', 'oktober', 'november', 'december',
 ]
 const ROUTINE_TITLES = ['Push', 'Pull', 'Legs', 'Upper']
+
+function getWeekStartForRow(week) {
+  const first = week.find(d => d !== null)
+  if (!first) return null
+  return getWeekStart(first)
+}
 
 function buildCalendarGrid(year, month) {
   const firstOfMonth = new Date(year, month - 1, 1)
@@ -93,19 +101,42 @@ export default function Workouts() {
   const [loading, setLoading] = useState(true)
   const [planDialogDate, setPlanDialogDate] = useState(null)
   const [highlightedId, setHighlightedId]   = useState(null)
+  const [deloadWeeks, setDeloadWeeks]       = useState([])
+  const [togglingWeek, setTogglingWeek]     = useState(null)
   const cardRefs = useRef({})
+
+  const deloadSet = useMemo(() => new Set(deloadWeeks), [deloadWeeks])
 
   const weeks = useMemo(() => buildCalendarGrid(year, month), [year, month])
 
   async function load() {
     setLoading(true)
     try {
-      const result = await fetchMonthWorkoutsData(year, month)
+      const [result, dlWeeks] = await Promise.all([
+        fetchMonthWorkoutsData(year, month),
+        fetchDeloadWeeks(),
+      ])
       setData(result)
+      setDeloadWeeks(dlWeeks)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleToggleDeload(weekStart) {
+    if (!weekStart || togglingWeek) return
+    setTogglingWeek(weekStart)
+    try {
+      const nowDeload = await toggleDeloadWeek(weekStart)
+      setDeloadWeeks(prev =>
+        nowDeload
+          ? [...prev, weekStart].sort()
+          : prev.filter(w => w !== weekStart)
+      )
+    } finally {
+      setTogglingWeek(null)
     }
   }
 
@@ -170,35 +201,52 @@ export default function Workouts() {
         </div>
 
         {/* Kalender grid */}
-        <div className="grid grid-cols-7 gap-0.5">
-          {WEEKDAY_LABELS.map((d) => (
-            <div
-              key={d}
-              className="text-center text-[10px] text-[var(--color-text-secondary)] font-[var(--font-mono)] pb-0.5"
-            >
-              {d}
-            </div>
-          ))}
+        <div className="flex flex-col gap-0.5">
+          {/* Header rij: spatie voor toggle-kolom + dag-labels */}
+          <div className="grid gap-0.5" style={{ gridTemplateColumns: '22px repeat(7, 1fr)' }}>
+            <div />
+            {WEEKDAY_LABELS.map((d) => (
+              <div
+                key={d}
+                className="text-center text-[10px] text-[var(--color-text-secondary)] font-[var(--font-mono)] pb-0.5"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
 
           {loading
             ? (
-              <div className="col-span-7 text-center text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm py-plate-5">
+              <div className="text-center text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm py-plate-5">
                 Laden...
               </div>
             )
-            : weeks.flatMap((week, wi) =>
-                week.map((dateStr, di) => (
-                  <CompactDayCell
-                    key={`${wi}-${di}`}
-                    dateStr={dateStr}
-                    isToday={dateStr === today}
-                    info={dateStr ? data?.dayMap?.get(dateStr) : null}
-                    maxVolume={data?.maxVolume ?? 0}
-                    onPlanClick={() => setPlanDialogDate(dateStr)}
-                    onDoneClick={handleCalendarDoneClick}
-                  />
-                ))
-              )
+            : weeks.map((week, wi) => {
+                const weekStart = getWeekStartForRow(week)
+                const isDeload  = weekStart ? deloadSet.has(weekStart) : false
+                return (
+                  <div key={wi} className="grid gap-0.5" style={{ gridTemplateColumns: '22px repeat(7, 1fr)' }}>
+                    <WeekToggleBtn
+                      weekStart={weekStart}
+                      isDeload={isDeload}
+                      toggling={togglingWeek === weekStart}
+                      onToggle={handleToggleDeload}
+                    />
+                    {week.map((dateStr, di) => (
+                      <CompactDayCell
+                        key={di}
+                        dateStr={dateStr}
+                        isToday={dateStr === today}
+                        info={dateStr ? data?.dayMap?.get(dateStr) : null}
+                        maxVolume={data?.maxVolume ?? 0}
+                        isDeload={isDeload}
+                        onPlanClick={() => setPlanDialogDate(dateStr)}
+                        onDoneClick={handleCalendarDoneClick}
+                      />
+                    ))}
+                  </div>
+                )
+              })
           }
         </div>
 
@@ -222,6 +270,10 @@ export default function Workouts() {
                 <span className="text-[10px] text-[var(--color-text-secondary)] font-[var(--font-body)]">{it.label}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px]">🌙</span>
+              <span className="text-[10px] text-[var(--color-text-secondary)] font-[var(--font-body)]">Deload</span>
+            </div>
           </div>
         </div>
       </div>
@@ -265,9 +317,31 @@ export default function Workouts() {
   )
 }
 
+// ─── WeekToggleBtn ────────────────────────────────────────────────────────────
+
+function WeekToggleBtn({ weekStart, isDeload, toggling, onToggle }) {
+  if (!weekStart) return <div />
+  return (
+    <button
+      type="button"
+      title={isDeload ? 'Deload week — klik om te verwijderen' : 'Markeer als deload week'}
+      onClick={() => onToggle(weekStart)}
+      disabled={toggling}
+      style={{ minHeight: 44 }}
+      className={`flex items-center justify-center rounded-md text-sm transition-all disabled:opacity-40 ${
+        isDeload
+          ? 'bg-[rgba(217,164,65,0.25)] text-[#D9A441]'
+          : 'bg-[var(--color-card)] text-[var(--color-text-secondary)] opacity-40 hover:opacity-100 hover:bg-[rgba(217,164,65,0.15)] hover:text-[#D9A441]'
+      }`}
+    >
+      🌙
+    </button>
+  )
+}
+
 // ─── CompactDayCell ───────────────────────────────────────────────────────────
 
-function CompactDayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDoneClick }) {
+function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick }) {
   if (!dateStr) return <div className="aspect-square" />
 
   const dayNum = Number(dateStr.slice(8, 10))
@@ -275,8 +349,8 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDone
   const isPlanned = info?.type === 'planned'
   const isClickable = !info || isDone || (isPlanned && info.status === 'planned')
 
-  let bgClass = 'bg-[var(--color-card)]'
-  if (isDone)                                              bgClass = 'bg-[var(--color-status-ok)]/[0.08]'
+  let bgClass = isDeload ? 'bg-[rgba(217,164,65,0.08)]' : 'bg-[var(--color-card)]'
+  if (isDone)                                              bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
   else if (isPlanned && info.status === 'planned')         bgClass = 'bg-[var(--color-data)]/[0.08]'
   else if (isPlanned && info.status === 'missed')          bgClass = 'bg-[var(--color-status-high)]/[0.08]'
   else if (isPlanned && info.status === 'skipped')         bgClass = 'bg-[var(--color-card)] opacity-50'
@@ -300,13 +374,13 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, onPlanClick, onDone
         isToday ? 'ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-bg)]' : ''
       } ${isClickable ? 'cursor-pointer hover:brightness-125' : ''}`}
     >
-      {/* Volume-bar bovenaan, gekleurd naar split */}
+      {/* Volume-bar bovenaan, gekleurd naar split (amber bij deload) */}
       {isDone && (
         <div
           className="absolute top-0 left-0 h-0.5"
           style={{
             width: `${loadPct}%`,
-            background: splitStyle?.color ?? 'var(--color-status-ok)',
+            background: isDeload ? '#D9A441' : (splitStyle?.color ?? 'var(--color-status-ok)'),
           }}
         />
       )}
