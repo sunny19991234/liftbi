@@ -151,7 +151,11 @@ function ExerciseChart({ title, data, dataKey, suffix, color }) {
           <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
             <CartesianGrid strokeDasharray="2 4" stroke={GRID_COLOR} vertical={false} />
             <XAxis dataKey="label" tick={AXIS_STYLE} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
-            <YAxis tick={AXIS_STYLE} axisLine={false} tickLine={false} width={38} />
+            <YAxis
+              tick={AXIS_STYLE} axisLine={false} tickLine={false} width={36}
+              domain={[dataMin => Math.max(0, dataMin - Math.ceil(dataMin * 0.05)), dataMax => dataMax + Math.ceil(dataMax * 0.03)]}
+              tickFormatter={(v) => Math.round(v)}
+            />
             <Tooltip content={<ChartTooltip suffix={suffix} />} cursor={{ stroke: '#2A2D31' }} />
             <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2}
               dot={{ r: 3.5, fill: color, stroke: 'none' }} activeDot={{ r: 5 }} />
@@ -194,7 +198,7 @@ function StatisticsTab({ sessions, period, onPeriodChange, accentColor }) {
           >{p.label}</button>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <ExerciseChart title="Zwaarst gewicht" data={weightData} dataKey="value" suffix=" kg" color={color} />
         <ExerciseChart title="Geschat 1RM (Epley)" data={e1rmData} dataKey="value" suffix=" kg" color="#FF4B3E" />
         <ExerciseChart title="Set volume per sessie" data={volData} dataKey="value" suffix=" kg" color="#22C55E" />
@@ -209,14 +213,28 @@ function HistoryTab({ sessions }) {
   if (!sessions.length) {
     return <p className="text-[var(--color-text-secondary)] text-sm font-[var(--font-body)]">Geen sessies gevonden.</p>
   }
+
+  const sessionsWithDelta = sessions.map((s, i) => {
+    if (i === 0) return { ...s, volumeDelta: null }
+    const prev = sessions[i - 1]
+    return { ...s, volumeDelta: s.volume - prev.volume }
+  })
+
   return (
     <div className="flex flex-col gap-3">
-      {[...sessions].reverse().map(s => {
+      {[...sessionsWithDelta].reverse().map(s => {
         const normalSets = s.sets.filter(x => x.set_type === 'normal' && x.weight_kg != null && x.reps != null)
+        const deltaColor = s.volumeDelta == null ? null : s.volumeDelta > 0 ? '#22C55E' : s.volumeDelta < 0 ? '#FF4B3E' : '#9499A1'
+        const deltaLabel = s.volumeDelta == null ? null : `${s.volumeDelta > 0 ? '↑' : s.volumeDelta < 0 ? '↓' : '='} ${Math.abs(s.volumeDelta)} kg`
         return (
           <div key={s.date} className="surface rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)]">{fmtDate(s.date)}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)]">{fmtDate(s.date)}</p>
+                {deltaLabel && (
+                  <span className="font-[var(--font-mono)] text-xs" style={{ color: deltaColor }}>{deltaLabel}</span>
+                )}
+              </div>
               <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
                 {normalSets.length} sets · {s.volume} kg
               </p>
@@ -505,16 +523,46 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
   const [filterGroup, setFilterGroup] = useState('all')
   const [search, setSearch] = useState('')
   const [error, setError] = useState(null)
+  const [sortBy, setSortBy] = useState('naam')
+  const [maxE1rmMap, setMaxE1rmMap] = useState(new Map())
+  const [mostRecentMap, setMostRecentMap] = useState(new Map())
 
   async function loadLibrary() {
-    const [{ data: sets, error: sErr }, { data: maps, error: mErr }] = await Promise.all([
-      supabase.from('sets').select('exercise_title'),
+    const [
+      { data: sets, error: sErr },
+      { data: maps, error: mErr },
+      { data: workouts, error: wErr },
+    ] = await Promise.all([
+      supabase.from('sets').select('exercise_title, weight_kg, reps, set_type, workout_id'),
       supabase.from('exercise_muscle_groups').select('id, exercise_title, muscle_group, contribution'),
+      supabase.from('workouts').select('id, start_date'),
     ])
     if (sErr) { setError(sErr.message); return }
     if (mErr) { setError(mErr.message); return }
+    if (wErr) { setError(wErr.message); return }
+
+    const dateById = new Map(workouts.map(w => [w.id, w.start_date]))
+    const e1rmMap = new Map()
+    const recentMap = new Map()
+    for (const s of sets) {
+      if (s.set_type === 'normal' && s.weight_kg != null && s.reps != null) {
+        const est = e1rm(s.weight_kg, s.reps)
+        if (est) {
+          const cur = e1rmMap.get(s.exercise_title) ?? 0
+          if (est > cur) e1rmMap.set(s.exercise_title, est)
+        }
+      }
+      const date = dateById.get(s.workout_id)
+      if (date) {
+        const cur = recentMap.get(s.exercise_title) ?? ''
+        if (date > cur) recentMap.set(s.exercise_title, date)
+      }
+    }
+
     setExercises([...new Set(sets.map(s => s.exercise_title))].sort())
     setMappings(maps)
+    setMaxE1rmMap(e1rmMap)
+    setMostRecentMap(recentMap)
   }
 
   useEffect(() => { loadLibrary() }, [])
@@ -564,7 +612,7 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
 
   const filteredExercises = useMemo(() => {
     if (!exercises) return []
-    return exercises.filter(title => {
+    const filtered = exercises.filter(title => {
       const maps = mappingsByExercise.get(title) ?? []
       const isUncat = maps.length === 0 || (maps.length === 1 && maps[0].muscle_group === 'Ongecategoriseerd')
       if (filterGroup === 'Ongecategoriseerd') { if (!isUncat) return false }
@@ -572,7 +620,18 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
       if (search.trim() && !title.toLowerCase().includes(search.trim().toLowerCase())) return false
       return true
     })
-  }, [exercises, mappingsByExercise, filterGroup, search])
+    if (sortBy === 'e1rm') {
+      return [...filtered].sort((a, b) => (maxE1rmMap.get(b) ?? 0) - (maxE1rmMap.get(a) ?? 0))
+    }
+    if (sortBy === 'recent') {
+      return [...filtered].sort((a, b) => {
+        const da = mostRecentMap.get(a) ?? ''
+        const db = mostRecentMap.get(b) ?? ''
+        return db.localeCompare(da)
+      })
+    }
+    return filtered
+  }, [exercises, mappingsByExercise, filterGroup, search, sortBy, maxE1rmMap, mostRecentMap])
 
   const selectedMappings = selected ? (mappingsByExercise.get(selected) ?? []) : []
 
@@ -585,14 +644,15 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
       <div className={`flex-1 overflow-y-auto min-w-0 flex flex-col ${selected ? '' : 'hidden sm:flex'}`}>
         {/* Terugknop op mobiel */}
         {selected && (
-          <div className="sm:hidden flex items-center px-3 py-2 border-b border-[#2A2D31]">
+          <div className="sm:hidden flex items-center gap-2 px-4 py-3 border-b border-[var(--color-border-subtle)] sticky top-0 z-10 bg-[var(--color-bg)]">
             <button
               onClick={() => setSelected(null)}
-              className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] font-[var(--font-body)] hover:text-[var(--color-text-primary)] transition-colors"
+              className="flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]"
             >
-              <i className="ti ti-arrow-left" style={{ fontSize: 14 }} />
+              <i className="ti ti-arrow-left" style={{ fontSize: 16 }} />
               Bibliotheek
             </button>
+            <span className="font-medium text-sm text-[var(--color-text-primary)] truncate">{selected}</span>
           </div>
         )}
         {!selected ? (
@@ -683,6 +743,22 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
               onChange={e => setSearch(e.target.value)}
               className="w-full bg-[var(--color-card)] text-[var(--color-text-primary)] rounded-lg pl-8 pr-3 py-2 text-xs outline-none border border-[#2A2D31] focus:border-[var(--color-accent)] font-[var(--font-body)] placeholder:text-[var(--color-text-secondary)]"
             />
+          </div>
+          <div className="flex gap-1">
+            {[{ key: 'naam', label: 'A–Z' }, { key: 'e1rm', label: '1RM' }, { key: 'recent', label: 'Recent' }].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setSortBy(opt.key)}
+                className="flex-1 py-1 rounded-lg text-[10px] font-[var(--font-mono)] transition-all border"
+                style={{
+                  background:  sortBy === opt.key ? 'var(--color-accent)' : 'transparent',
+                  color:       sortBy === opt.key ? '#fff' : 'var(--color-text-secondary)',
+                  borderColor: sortBy === opt.key ? 'var(--color-accent)' : 'var(--color-border)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

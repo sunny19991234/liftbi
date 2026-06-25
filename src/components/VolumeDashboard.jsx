@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { fetchStatsForPeriod } from '../lib/statsData'
 import { fetchDeloadWeeks } from '../lib/deloadData'
+import { detectImbalances } from '../lib/imbalanceData'
 
 // ─── Constanten ───────────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ function MetricSelector({ metrics, value, onChange, accentColor = '#FF4B3E' }) {
 function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
   const values    = weeklyData.map(w => (w[metric] ?? 0))
   const max       = Math.max(...values, 1)
+  const avg       = values.reduce((s, v) => s + v, 0) / values.length
   const lastIdx   = weeklyData.length - 1
   const BAR_MAX   = 52
   const manyWeeks = weeklyData.length > 12
@@ -165,14 +167,15 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
           const barH     = v > 0 ? Math.max(4, Math.round((v / max) * BAR_MAX)) : 0
           const isLast   = i === lastIdx
           const isDeload = deloadWeekSet?.has(w.weekStart)
+          const above    = v >= avg
 
           const barColor = isDeload
-            ? (isLast ? '#D9A441' : 'rgba(217,164,65,0.40)')
-            : (isLast ? '#FF4B3E' : '#FF4B3E50')
+            ? (isLast ? '#D9A441' : '#D9A44180')
+            : (isLast ? '#FF4B3E' : (above ? '#FF4B3EAA' : '#FF4B3E55'))
 
           const labelColor = isDeload
-            ? '#D9A441'
-            : isLast ? '#FF4B3E' : 'var(--color-text-secondary)'
+            ? (isLast ? '#D9A441' : '#D9A44180')
+            : isLast ? '#FF4B3E' : (above ? '#FF4B3EAA' : '#FF4B3E55')
 
           return (
             <div
@@ -246,6 +249,11 @@ function OverallStatsHero({ overall, loading, weeksBack, deloadWeekSet }) {
   return (
     <div className="surface-hero rounded-xl overflow-hidden" style={{ position: 'relative' }}>
       <div className="loaded-bar" style={{ '--load-pct': `${loadPct}%` }} />
+      {weeklyData.length > 1 && (
+        <p className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)] px-plate-3 pt-1 pb-0 opacity-60">
+          balk = huidige week vs beste week ({loadPct}%)
+        </p>
+      )}
 
       <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 10 }}>
         <i className="ti ti-chart-area-line"
@@ -361,12 +369,12 @@ function WeeklyBars({ weeklyData, metric, color, deloadWeekSet }) {
           const isDeload = deloadWeekSet?.has(w.weekStart)
 
           const barBg = isDeload
-            ? (isLast ? 'rgba(217,164,65,0.65)' : 'rgba(217,164,65,0.30)')
-            : (isLast ? color : above ? `${color}80` : `${color}40`)
+            ? (isLast ? '#D9A441' : '#D9A44180')
+            : (isLast ? color : above ? `${color}AA` : `${color}55`)
 
           const labelColor = isDeload
-            ? '#D9A441'
-            : isLast ? color : 'var(--color-text-secondary)'
+            ? (isLast ? '#D9A441' : '#D9A44180')
+            : isLast ? color : (above ? `${color}AA` : `${color}55`)
 
           return (
             <div
@@ -452,8 +460,8 @@ function MuscleGroupRow({ data, isSelected, onSelect, deloadWeekSet }) {
 
           {/* Chevron */}
           <i
-            className={`ti ti-chevron-${isSelected ? 'up' : 'down'}`}
-            style={{ fontSize: 13, color: 'var(--color-text-secondary)', flexShrink: 0 }}
+            className={`ti ti-chevron-down transition-transform duration-200 ${isSelected ? 'rotate-180' : ''}`}
+            style={{ fontSize: 14, color: 'var(--color-text-secondary)', flexShrink: 0 }}
           />
         </div>
       </button>
@@ -482,6 +490,48 @@ function MuscleGroupRow({ data, isSelected, onSelect, deloadWeekSet }) {
 
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Volume targets imbalance bar ────────────────────────────────────────────
+
+function ImbalanceBar({ imbalances }) {
+  if (!imbalances?.length) return null
+
+  const statusColor = (status) => {
+    if (status === 'low')  return '#D9A441'
+    if (status === 'high') return 'var(--color-accent)'
+    return 'var(--color-status-ok)'
+  }
+
+  return (
+    <div className="surface rounded-xl px-plate-3 py-plate-3">
+      <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
+        Volume targets · deze week
+      </p>
+      <div className="flex flex-col gap-2">
+        {imbalances.map(item => {
+          const pct   = Math.min(100, Math.round((item.setCount / item.max) * 100))
+          const color = statusColor(item.status)
+          return (
+            <div key={item.muscle_group}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-[var(--font-body)] text-xs capitalize"
+                  style={{ color: 'var(--color-text-primary)' }}>
+                  {item.muscle_group}
+                </span>
+                <span className="font-[var(--font-mono)] text-[10px]" style={{ color }}>
+                  {item.setCount} sets
+                </span>
+              </div>
+              <div style={{ background: 'var(--color-border)', height: 4, borderRadius: 2 }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2 }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -521,6 +571,7 @@ export default function VolumeDashboard() {
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
   const [deloadWeeks, setDeloadWeeks] = useState([])
+  const [imbalances,  setImbalances]  = useState([])
 
   useEffect(() => {
     setLoading(true)
@@ -528,10 +579,12 @@ export default function VolumeDashboard() {
     Promise.all([
       fetchStatsForPeriod(weeksBack),
       fetchDeloadWeeks(),
+      detectImbalances(),
     ])
-      .then(([data, dlWeeks]) => {
+      .then(([data, dlWeeks, imb]) => {
         setStats(data)
         setDeloadWeeks(dlWeeks)
+        setImbalances(imb)
         setLoading(false)
       })
       .catch(err => { setError(err.message); setLoading(false) })
@@ -563,6 +616,10 @@ export default function VolumeDashboard() {
         weeksBack={weeksBack}
         deloadWeekSet={deloadWeekSet}
       />
+
+      {!loading && weeksBack <= 4 && (
+        <ImbalanceBar imbalances={imbalances} />
+      )}
 
       {!loading && stats && (
         <MuscleGroupSection byMuscleGroup={stats.byMuscleGroup} deloadWeekSet={deloadWeekSet} />
