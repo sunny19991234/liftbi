@@ -14,7 +14,14 @@
 // niet meer uit elkaar lopen.
 
 import { fetchSetsWithMuscleGroups, fetchVolumeTargets, getWeekStart } from './dashboardQueries'
+import { fetchDeloadWeeks } from './deloadData'
 import { getTodayStr } from './calendarData'
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
 const SPLIT_MUSCLE_MAP = {
   Push:  ['Borst', 'Schouders', 'Triceps'],
@@ -95,4 +102,89 @@ export async function detectImbalances(upcomingPlanned = []) {
   }
 
   return results.sort((a, b) => b.distance - a.distance)
+}
+
+/**
+ * Berekent over hoeveel van de afgelopen N weken elke spiergroep in de
+ * target range zat. Sluit de huidige (lopende) week en deload weken uit.
+ *
+ * Return: Array gesorteerd op hitRate ASC (laagste eerst):
+ *   { muscle_group, hitRate, weeksInRange, totalWeeks, min, max }
+ */
+export async function calculateHitRate(weeksBack) {
+  if (weeksBack === -1) return []  // vorige week: te weinig data voor hit rate
+
+  const effectiveWeeks = weeksBack === 0 ? 520 : weeksBack
+  const [sets, targets, deloadWeeksArr] = await Promise.all([
+    fetchSetsWithMuscleGroups(effectiveWeeks + 2),
+    fetchVolumeTargets(),
+    fetchDeloadWeeks(),
+  ])
+
+  const today           = getTodayStr()
+  const currentWeekStart = getWeekStart(today)
+  const deloadSet        = new Set(deloadWeeksArr)
+
+  // Bouw volledige weeklijst (excl. lopende week)
+  const weeks = []
+  if (weeksBack === 0) {
+    if (!sets.length) return []
+    const earliest = sets
+      .map(s => s.start_date)
+      .filter(Boolean)
+      .reduce((a, b) => (a < b ? a : b))
+    let cur = getWeekStart(earliest)
+    while (cur < currentWeekStart) {
+      weeks.push(cur)
+      cur = addDays(cur, 7)
+    }
+  } else {
+    for (let i = weeksBack - 1; i >= 1; i--) {
+      weeks.push(getWeekStart(addDays(today, -i * 7)))
+    }
+  }
+
+  // Filter deload weken
+  const workWeeks = weeks.filter(w => !deloadSet.has(w))
+  if (workWeeks.length < 2) return []
+  const workWeekSet = new Set(workWeeks)
+
+  // Sets per spiergroep per week sommeren
+  const setsByMgByWeek = new Map()
+  for (const s of sets) {
+    if (!s.start_date) continue
+    const ws = getWeekStart(s.start_date)
+    if (!workWeekSet.has(ws)) continue
+    const mg     = s.muscle_group
+    const factor = s.contribution ?? 1.0
+    if (!setsByMgByWeek.has(mg)) setsByMgByWeek.set(mg, new Map())
+    const mgMap = setsByMgByWeek.get(mg)
+    mgMap.set(ws, (mgMap.get(ws) ?? 0) + factor)
+  }
+
+  const results = []
+  for (const target of targets) {
+    const mg    = target.muscle_group
+    const min   = target.min_sets_per_week
+    const max   = target.max_sets_per_week
+    const mgMap = setsByMgByWeek.get(mg) ?? new Map()
+
+    let weeksInRange = 0
+    for (const ws of workWeeks) {
+      const count = Math.round((mgMap.get(ws) ?? 0) * 10) / 10
+      if (count >= min && count <= max) weeksInRange++
+    }
+
+    const totalWeeks = workWeeks.length
+    results.push({
+      muscle_group: mg,
+      hitRate:      totalWeeks > 0 ? weeksInRange / totalWeeks : 0,
+      weeksInRange,
+      totalWeeks,
+      min,
+      max,
+    })
+  }
+
+  return results.sort((a, b) => a.hitRate - b.hitRate)
 }

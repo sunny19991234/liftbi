@@ -50,14 +50,21 @@ export function computeTrend(weeklyData) {
 }
 
 export async function fetchStatsForPeriod(weeksBack = 4) {
-  const today     = getTodayStr()
-  const isAllTime = weeksBack === 0
+  const today      = getTodayStr()
+  const isAllTime  = weeksBack === 0
+  const isPrevWeek = weeksBack === -1
 
   // Workouts ophalen — all time of gefilterd op oudste weekstart
   let workoutQuery = supabase.from('workouts').select('id, start_date, start_time, end_time')
   if (!isAllTime) {
-    const oldestWeekStart = getWeekStart(addDays(today, -(weeksBack - 1) * 7))
-    workoutQuery = workoutQuery.gte('start_date', oldestWeekStart)
+    if (isPrevWeek) {
+      const prevWeekStart    = getWeekStart(addDays(today, -7))
+      const currentWeekStart = getWeekStart(today)
+      workoutQuery = workoutQuery.gte('start_date', prevWeekStart).lt('start_date', currentWeekStart)
+    } else {
+      const oldestWeekStart = getWeekStart(addDays(today, -(weeksBack - 1) * 7))
+      workoutQuery = workoutQuery.gte('start_date', oldestWeekStart)
+    }
   }
 
   const { data: workouts, error: wErr } = await workoutQuery
@@ -89,7 +96,9 @@ export async function fetchStatsForPeriod(weeksBack = 4) {
 
   // Weken array oud → nieuw
   const weeks = []
-  if (isAllTime) {
+  if (isPrevWeek) {
+    weeks.push(getWeekStart(addDays(today, -7)))
+  } else if (isAllTime) {
     const earliest = workouts.reduce((m, w) => w.start_date < m ? w.start_date : m, workouts[0].start_date)
     let cur = getWeekStart(earliest)
     const todayWeek = getWeekStart(today)
