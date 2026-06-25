@@ -20,6 +20,12 @@ const TABS = [
 function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn())
   const [tab, setTab] = useState('home')
+  const [initialExercise, setInitialExercise] = useState(null)
+
+  function onNavigate(tabId, options = {}) {
+    setTab(tabId)
+    if (options.exercise) setInitialExercise(options.exercise)
+  }
 
   if (!loggedIn) {
     return <Login onLoginSuccess={() => setLoggedIn(true)} />
@@ -39,7 +45,7 @@ function App() {
             {visibleTabs.map((t) => (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => onNavigate(t.id)}
                 className={`px-plate-3 py-plate-1 rounded-lg text-sm font-[var(--font-body)] transition-all ${
                   tab === t.id
                     ? 'bg-[var(--color-accent)] text-white shadow-[0_2px_12px_-2px_rgba(255,75,62,0.5)]'
@@ -56,9 +62,14 @@ function App() {
 
       {/* Pagina-inhoud — extra ondermarge op mobiel voor de bottom nav */}
       <div className="pb-20 sm:pb-0">
-        {tab === 'home'       && <Home onNavigate={setTab} onTokenExpired={() => setLoggedIn(false)} />}
+        {tab === 'home'       && <Home onNavigate={onNavigate} onTokenExpired={() => setLoggedIn(false)} />}
         {tab === 'volume'     && <VolumeDashboard />}
-        {tab === 'oefeningen' && <ExerciseLibrary />}
+        {tab === 'oefeningen' && (
+          <ExerciseLibrary
+            initialExercise={initialExercise}
+            onResetInitialExercise={() => setInitialExercise(null)}
+          />
+        )}
         {tab === 'maand'      && <MonthlyComparison />}
         {tab === 'prs'        && <PersonalRecords />}
         {tab === 'workouts'   && <Workouts />}
@@ -70,7 +81,7 @@ function App() {
           {visibleTabs.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => onNavigate(t.id)}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
                 tab === t.id
                   ? 'text-[var(--color-accent)]'

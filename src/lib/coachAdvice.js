@@ -188,8 +188,7 @@ export async function fetchCoachAdviceForType(workoutTitle) {
     if (advice) advices.push(advice)
   }
 
-  // Sorteer: eerst de actionabele (gewicht/reps omhoog), dan handhaven, dan omlaag
-  const order = { gewicht_omhoog: 0, reps_omhoog: 1, handhaven: 2, consolideren: 3, gewicht_omlaag: 4 }
+  const order = { gewicht_omlaag: 0, gewicht_omhoog: 1, reps_omhoog: 2, consolideren: 3, handhaven: 4 }
   advices.sort((a, b) => (order[a.action] ?? 5) - (order[b.action] ?? 5))
 
   return {
@@ -285,7 +284,7 @@ export async function calculateReadinessScore(workoutTitle = null) {
 export async function calculateStreak(minSessionsPerWeek = 3) {
   const { data: workouts, error } = await supabase
     .from('workouts')
-    .select('start_date')
+    .select('id, start_date')
     .order('start_date', { ascending: false })
 
   if (error) throw error
@@ -327,9 +326,32 @@ export async function calculateStreak(minSessionsPerWeek = 3) {
     }
   }
 
-  // Heatmap: laatste 10 weken × 7 dagen
+  // Heatmap: laatste 10 weken × 7 dagen + volumeKg per dag
   const heatmapDays = []
   const workoutDates = new Set(workouts.map((w) => w.start_date))
+
+  // Fetch sets voor de laatste 70 dagen zodat we intensiteitsniveaus kunnen tonen
+  const cutoff70 = new Date(today)
+  cutoff70.setUTCDate(cutoff70.getUTCDate() - 70)
+  const cutoff70Str = cutoff70.toISOString().slice(0, 10)
+  const recentWos = workouts.filter((w) => w.start_date >= cutoff70Str)
+  const volByDate = new Map()
+  if (recentWos.length > 0) {
+    const { data: sets } = await supabase
+      .from('sets')
+      .select('workout_id, weight_kg, reps')
+      .in('workout_id', recentWos.map((w) => w.id))
+      .not('weight_kg', 'is', null)
+      .not('reps', 'is', null)
+    if (sets) {
+      const idToDate = new Map(recentWos.map((w) => [w.id, w.start_date]))
+      for (const s of sets) {
+        const date = idToDate.get(s.workout_id)
+        if (date) volByDate.set(date, (volByDate.get(date) ?? 0) + s.weight_kg * s.reps)
+      }
+    }
+  }
+
   for (let i = 69; i >= 0; i--) {
     const d = new Date(today)
     d.setUTCDate(d.getUTCDate() - i)
@@ -339,6 +361,7 @@ export async function calculateStreak(minSessionsPerWeek = 3) {
       date: ds,
       done: workoutDates.has(ds),
       isToday,
+      volumeKg: Math.round(volByDate.get(ds) ?? 0),
     })
   }
 
@@ -347,13 +370,20 @@ export async function calculateStreak(minSessionsPerWeek = 3) {
 
 /**
  * Haalt de beste week (hoogste volume) ooit op + het huidige weekvolume.
+ * dayOfWeek 0=ma…6=zo: vergelijkt alleen t/m dezelfde weekdag voor eerlijke vergelijking.
  */
-export async function fetchBestWeekComparison(currentWeekVol) {
+export async function fetchBestWeekComparison(currentWeekVol, dayOfWeek = 6) {
   function getWeekStart(dateStr) {
     const d = new Date(dateStr + 'T00:00:00Z')
     const day = d.getUTCDay()
     const diff = day === 0 ? -6 : 1 - day
     d.setUTCDate(d.getUTCDate() + diff)
+    return d.toISOString().slice(0, 10)
+  }
+
+  function addDaysUTC(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00Z')
+    d.setUTCDate(d.getUTCDate() + n)
     return d.toISOString().slice(0, 10)
   }
 
@@ -379,6 +409,8 @@ export async function fetchBestWeekComparison(currentWeekVol) {
   const volByWeek = new Map()
   for (const w of workouts) {
     const ws = getWeekStart(w.start_date)
+    const cutoff = addDaysUTC(ws, dayOfWeek)
+    if (w.start_date > cutoff) continue
     volByWeek.set(ws, (volByWeek.get(ws) ?? 0) + (volByWorkout.get(w.id) ?? 0))
   }
 

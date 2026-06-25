@@ -496,7 +496,7 @@ function ExerciseDetailPanel({ exercise, mappings, exerciseSets, prs, onReload }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export default function ExerciseLibrary() {
+export default function ExerciseLibrary({ initialExercise, onResetInitialExercise }) {
   const [exercises, setExercises] = useState(null)
   const [mappings, setMappings] = useState(null)
   const [selected, setSelected] = useState(null)
@@ -518,6 +518,16 @@ export default function ExerciseLibrary() {
   }
 
   useEffect(() => { loadLibrary() }, [])
+
+  useEffect(() => {
+    if (!initialExercise || !exercises) return
+    const title = exercises.find((e) => e === initialExercise)
+    if (title) {
+      handleSelect(title)
+      onResetInitialExercise?.()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialExercise, exercises])
 
   async function loadSetsFor(exerciseTitle) {
     setExerciseSets(null)

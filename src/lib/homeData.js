@@ -98,10 +98,10 @@ export async function fetchDayStrip(daysBack = 3, daysForward = 3) {
 
 /**
  * Telt sets/volume/gem.RPE op voor een gegeven kalenderweek (maandag t/m
- * zondag, op basis van weekStartDate = de maandag van die week).
+ * weekStartDate + maxDaysFromStart, standaard de volledige week).
  */
-async function fetchVolumeForWeek(weekStartDate) {
-  const weekEndDate = addDays(weekStartDate, 6)
+async function fetchVolumeForWeek(weekStartDate, maxDaysFromStart = 6) {
+  const weekEndDate = addDays(weekStartDate, maxDaysFromStart)
 
   const { data: workouts, error: wErr } = await supabase
     .from('workouts')
@@ -178,10 +178,10 @@ export async function fetchWeekVolume() {
 }
 
 /**
- * Vorige volledige kalenderweek (maandag t/m zondag).
+ * Vorige kalenderweek t/m dag dayOfWeek (0=ma … 6=zo, standaard volledige week).
  */
-export async function fetchPreviousWeekVolume() {
+export async function fetchPreviousWeekVolume(dayOfWeek = 6) {
   const currentWeekStart = getWeekStart(getTodayStr())
   const previousWeekStart = addDays(currentWeekStart, -7)
-  return fetchVolumeForWeek(previousWeekStart)
+  return fetchVolumeForWeek(previousWeekStart, dayOfWeek)
 }

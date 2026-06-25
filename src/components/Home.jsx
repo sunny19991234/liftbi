@@ -107,6 +107,8 @@ export default function Home({ onNavigate, onTokenExpired }) {
   const [error, setError]                     = useState(null)
 
   const today = getTodayStr()
+  const rawUTCDay = new Date(today + 'T00:00:00Z').getUTCDay() // 0=zo
+  const dayOfWeek = rawUTCDay === 0 ? 6 : rawUTCDay - 1 // ma=0 … zo=6
 
   function loadAll() {
     async function run() {
@@ -119,7 +121,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
         await Promise.all([
           fetchDayStrip(),
           fetchWeekVolume(),
-          fetchPreviousWeekVolume(),
+          fetchPreviousWeekVolume(dayOfWeek),
           detectPlateaus(),
           detectImbalances(),
           calculateAllPRs(),
@@ -142,7 +144,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setUpcomingPlanned(upcomingWos)
       setDeloadWeeks(dlWeeks)
 
-      fetchBestWeekComparison(vol.volumeKg).then(setBestWeek).catch(() => {})
+      fetchBestWeekComparison(vol.volumeKg, dayOfWeek).then(setBestWeek).catch(() => {})
       loadCoachAdvice(next)
     }
     run().catch((err) => setError(err.message))
@@ -197,55 +199,59 @@ export default function Home({ onNavigate, onTokenExpired }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col gap-plate-3">
+    <div className="max-w-3xl xl:max-w-none mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col gap-plate-3">
 
-      {/* Deload banner — alleen zichtbaar tijdens deload week */}
+      {/* Deload banner — volledige breedte, boven het grid */}
       {isCurrentDeload && <DeloadBanner />}
 
-      {/* 1. Readiness hero */}
-      <ReadinessHero
-        readiness={readiness}
-        nextPlanned={nextPlanned}
-        todayInfo={todayInfo}
-        todayIsRestDay={todayIsRestDay}
-        streak={streak}
-        recentWorkouts={recentWorkouts}
-        upcomingPlanned={upcomingPlanned}
-        isCurrentDeload={isCurrentDeload}
-        weeksSinceDeload={weeksSinceDeload}
-        onNavigate={onNavigate}
-      />
+      {/* XL: 2 kolommen; sm/md: gestapeld */}
+      <div className="flex flex-col gap-plate-3 xl:grid xl:grid-cols-2 xl:gap-plate-4 xl:items-start">
 
-      {/* 2. Coach-advies */}
-      {coachAdvice && coachAdvice.advices.length > 0 && (
-        <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
-      )}
+        {/* Kolom 1 (links): Readiness + Coach-advies */}
+        <div className="flex flex-col gap-plate-3">
+          <ReadinessHero
+            readiness={readiness}
+            nextPlanned={nextPlanned}
+            todayInfo={todayInfo}
+            todayIsRestDay={todayIsRestDay}
+            streak={streak}
+            recentWorkouts={recentWorkouts}
+            upcomingPlanned={upcomingPlanned}
+            isCurrentDeload={isCurrentDeload}
+            weeksSinceDeload={weeksSinceDeload}
+            onNavigate={onNavigate}
+          />
+          {coachAdvice && coachAdvice.advices.length > 0 && (
+            <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
+          )}
+        </div>
 
-      {/* 3. Streak + Weekstatistieken — naast elkaar op desktop, gestapeld op mobiel */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-plate-3">
-        {streak !== null && <StreakCard streak={streak} />}
-        <WeekComparisonCard
-          weekVolume={weekVolume}
-          prevWeekVolume={prevWeekVolume}
-          bestWeek={bestWeek}
-          isCurrentDeload={isCurrentDeload}
-          isPrevDeload={isPrevDeload}
-          onNavigate={onNavigate}
-        />
+        {/* Kolom 2 (rechts): Streak + Week, Signalen, Upload */}
+        <div className="flex flex-col gap-plate-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-plate-3">
+            {streak !== null && <StreakCard streak={streak} />}
+            <WeekComparisonCard
+              weekVolume={weekVolume}
+              prevWeekVolume={prevWeekVolume}
+              bestWeek={bestWeek}
+              isCurrentDeload={isCurrentDeload}
+              isPrevDeload={isPrevDeload}
+              onNavigate={onNavigate}
+              dayOfWeek={dayOfWeek}
+            />
+          </div>
+          <ProactiveSignals
+            plateaus={plateaus}
+            topPRs={topPRs}
+            recentWorkouts={recentWorkouts}
+            imbalances={imbalances}
+            isDeload={isCurrentDeload}
+            onNavigate={onNavigate}
+          />
+          <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
+        </div>
+
       </div>
-
-      {/* 4. Proactieve signalen — plateau en disbalans gedempt tijdens deload */}
-      <ProactiveSignals
-        plateaus={plateaus}
-        topPRs={topPRs}
-        recentWorkouts={recentWorkouts}
-        isDeload={isCurrentDeload}
-        onNavigate={onNavigate}
-      />
-
-      {/* 5. Upload — klein, onderaan */}
-      <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
-
     </div>
   )
 }
@@ -255,10 +261,11 @@ export default function Home({ onNavigate, onTokenExpired }) {
 function DeloadBanner() {
   return (
     <div
-      className="rounded-xl flex items-center gap-3 px-plate-3 py-plate-3"
+      className="rounded-xl flex items-center gap-3 px-plate-3 py-plate-3 border border-l-4"
       style={{
-        background: 'rgba(217,164,65,0.10)',
-        border: '1px solid rgba(217,164,65,0.30)',
+        background: 'rgba(217,164,65,0.18)',
+        borderColor: 'rgba(217,164,65,0.50)',
+        borderLeftColor: '#D9A441',
       }}
     >
       <div style={{
@@ -365,7 +372,7 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
 
   return (
     <button
-      onClick={() => onNavigate('agenda')}
+      onClick={() => onNavigate('workouts')}
       className="surface-hero text-left rounded-xl w-full hover:brightness-110 transition-all"
       style={{ overflow: 'hidden', position: 'relative' }}
     >
@@ -426,47 +433,43 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
         </div>
       </div>
 
-      {/* "→ Bekijk agenda" footer */}
-      <div className="px-plate-3 pb-2 pt-1 flex justify-end">
-        <span className="font-[var(--font-mono)] text-[9px]" style={{ color: 'var(--color-data)' }}>
-          → Bekijk agenda
-        </span>
-      </div>
-
-      {/* Mesocyclus strip — tijdlijn met pijltjes */}
-      {mesoItems.length > 0 && (
-        <div className="border-t border-[var(--color-border-subtle)] px-plate-3 py-2.5">
-          <div className="flex items-center justify-between mb-2">
-            {isCurrentDeload ? (
-              <span
-                className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em] flex items-center gap-1"
-                style={{
-                  color: '#D9A441',
-                  background: 'rgba(217,164,65,0.12)',
-                  border: '1px solid rgba(217,164,65,0.30)',
-                  borderRadius: 3,
-                  padding: '2px 6px',
-                }}
-              >
-                <i className="ti ti-moon-stars" style={{ fontSize: 9 }} />
-                Deload
-              </span>
-            ) : (
-              <span
-                className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em]"
-                style={{
-                  color: 'var(--color-accent)',
-                  background: 'var(--color-accent)14',
-                  border: '1px solid var(--color-accent)28',
-                  borderRadius: 3,
-                  padding: '2px 6px',
-                }}
-              >
-                Week {mesoWeek}
-              </span>
-            )}
-          </div>
-          <div className="flex items-end overflow-x-auto gap-0" style={{ scrollbarWidth: 'none' }}>
+      {/* Vaste onderste balk: mesostrip-label links, Bekijk agenda rechts */}
+      <div className="border-t border-[var(--color-border-subtle)] px-plate-3 py-2.5">
+        <div className="flex items-center justify-between mb-2">
+          {isCurrentDeload ? (
+            <span
+              className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em] flex items-center gap-1"
+              style={{
+                color: '#D9A441',
+                background: 'rgba(217,164,65,0.12)',
+                border: '1px solid rgba(217,164,65,0.30)',
+                borderRadius: 3,
+                padding: '2px 6px',
+              }}
+            >
+              <i className="ti ti-moon-stars" style={{ fontSize: 9 }} />
+              Deload
+            </span>
+          ) : (
+            <span
+              className="font-[var(--font-mono)] text-[8px] uppercase tracking-[0.12em]"
+              style={{
+                color: 'var(--color-accent)',
+                background: 'var(--color-accent)14',
+                border: '1px solid var(--color-accent)28',
+                borderRadius: 3,
+                padding: '2px 6px',
+              }}
+            >
+              Week {mesoWeek}
+            </span>
+          )}
+          <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">
+            Bekijk agenda →
+          </span>
+        </div>
+        {mesoItems.length > 0 && (
+        <div className="flex items-end overflow-x-auto gap-0" style={{ scrollbarWidth: 'none' }}>
             {mesoItems.map((item, i) => {
               const isCurrent = item.isToday || item.diff === 0
               const isNext = item.isNext && !item.isToday
@@ -522,8 +525,8 @@ function ReadinessHero({ readiness, nextPlanned, todayInfo, todayIsRestDay, stre
               )
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </button>
   )
 }
@@ -536,6 +539,18 @@ function StreakCard({ streak }) {
   const weeks5 = []
   for (let w = 5; w < 10; w++) {
     weeks5.push(heatmap.slice(w * 7, w * 7 + 7))
+  }
+
+  // Kwartiel-intensiteit op basis van volumeKg
+  const nonZeroVols = weeks5.flat().filter((d) => d.volumeKg > 0).map((d) => d.volumeKg).sort((a, b) => a - b)
+  const q1 = nonZeroVols[Math.floor(nonZeroVols.length * 0.25)] ?? 0
+  const q2 = nonZeroVols[Math.floor(nonZeroVols.length * 0.5)] ?? 0
+  const INTENSITY_COLORS = ['transparent', '#22C55E30', '#22C55E70', '#22C55E']
+  function intensityLevel(vol) {
+    if (!vol || vol === 0) return 0
+    if (vol <= q1) return 1
+    if (vol <= q2) return 2
+    return 3
   }
 
   return (
@@ -555,24 +570,27 @@ function StreakCard({ streak }) {
         </span>
       </div>
 
-      {/* Heatmap: 5 weken × 7 dagen, vult de volle breedte */}
+      {/* Heatmap: 5 weken × 7 dagen met intensiteitsniveaus */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
         {weeks5.map((week, wi) => (
           <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {week.map((day, di) => (
-              <div
-                key={di}
-                title={day.date}
-                style={{
-                  width: '100%', height: 11,
-                  borderRadius: 2,
-                  background: day.isToday ? 'var(--color-accent)'
-                    : day.done ? 'rgba(34,197,94,0.7)'
-                    : 'var(--color-border)',
-                  boxShadow: day.isToday ? '0 0 0 1px var(--color-bg), 0 0 0 2px var(--color-accent)' : 'none',
-                }}
-              />
-            ))}
+            {week.map((day, di) => {
+              const level = day.done ? Math.max(1, intensityLevel(day.volumeKg)) : 0
+              return (
+                <div
+                  key={di}
+                  title={day.date}
+                  style={{
+                    width: '100%', height: 11,
+                    borderRadius: 2,
+                    background: day.isToday ? 'var(--color-accent)'
+                      : level === 0 ? 'var(--color-border)'
+                      : INTENSITY_COLORS[level],
+                    boxShadow: day.isToday ? '0 0 0 1px var(--color-bg), 0 0 0 2px var(--color-accent)' : 'none',
+                  }}
+                />
+              )
+            })}
           </div>
         ))}
       </div>
@@ -661,10 +679,23 @@ function AdviceRow({ advice }) {
     }
   }
 
+  const isDownward = action === 'gewicht_omlaag'
+
   return (
     <div
       className="py-2.5 border-b border-[var(--color-bg)] last:border-0"
-      style={{ paddingLeft: 10, borderLeft: `3px solid ${color}` }}
+      style={{
+        paddingLeft: 10,
+        borderLeft: `3px solid ${color}`,
+        ...(isDownward ? {
+          background: 'rgba(255,75,62,0.08)',
+          borderRadius: 6,
+          borderTop: '1px solid rgba(255,75,62,0.25)',
+          borderRight: '1px solid rgba(255,75,62,0.25)',
+          borderBottom: '1px solid rgba(255,75,62,0.25)',
+          marginBottom: 4,
+        } : {}),
+      }}
     >
       <div className="flex items-center gap-1.5 mb-1">
         <span
@@ -705,7 +736,10 @@ function AdviceRow({ advice }) {
 
 // ─── Week vs beste week ───────────────────────────────────────────────────────
 
-function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDeload, isPrevDeload, onNavigate }) {
+const DAY_NAMES_NL = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag']
+
+function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDeload, isPrevDeload, onNavigate, dayOfWeek }) {
+  const dagnaam = DAY_NAMES_NL[dayOfWeek ?? 6]
   const loaded = weekVolume !== null
   const isEmptyWeek = weekVolume && weekVolume.volumeKg === 0 && weekVolume.setCount === 0
 
@@ -833,6 +867,9 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDel
               <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">
                 {bestWeek.pct}% van beste week
               </span>
+              <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)] opacity-60 ml-1">
+                t/m {dagnaam}
+              </span>
             </div>
           )}
         </div>
@@ -859,142 +896,132 @@ function DeltaPill({ pct }) {
   )
 }
 
-// ─── Proactieve signalen (samengevoegd) ───────────────────────────────────────
+// ─── Proactieve signalen ──────────────────────────────────────────────────────
 
-function ProactiveSignals({ plateaus, topPRs, recentWorkouts, isDeload, onNavigate }) {
+function ProactiveSignals({ plateaus, topPRs, recentWorkouts, imbalances, isDeload, onNavigate }) {
   const hasData = (plateaus || topPRs) !== null
 
-  // PRs gefilterd op de laatste 4 workouts
   const last4Dates = new Set((recentWorkouts ?? []).slice(0, 4).map((w) => w.start_date))
   const recentPRs = topPRs
     ? topPRs.filter((pr) => pr.oneRepMax?.date && last4Dates.has(pr.oneRepMax.date))
     : []
 
-  // Tijdens deload: plateau-meldingen dempen (gewicht is bewust lager)
   const visiblePlateaus = isDeload ? [] : (plateaus ?? [])
-  const signalCount = visiblePlateaus.length + recentPRs.length
+  const visibleImbalances = isDeload ? [] : (imbalances ?? []).slice(0, 2)
+  const signalCount = recentPRs.length + visiblePlateaus.length + visibleImbalances.length
 
   if (!hasData || signalCount === 0) return null
 
   return (
-    <div className="surface rounded-xl p-plate-3" style={{ position: 'relative' }}>
-      {/* Header met icon */}
-      <div className="flex items-center justify-between mb-plate-2">
-        <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)]">
-          Signalen
+    <div className="flex flex-col gap-2">
+      {/* Sectie-label */}
+      <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest px-0.5"
+        style={{ color: 'var(--color-text-secondary)' }}>
+        Signalen · {signalCount}
+      </p>
+
+      {/* PRs — altijd bovenaan, meest feestelijk */}
+      {recentPRs.slice(0, 3).map((pr) => (
+        <SignalCard
+          key={pr.exercise_title}
+          icon="trophy"
+          iconStyle={{
+            background: 'linear-gradient(135deg, rgba(255,196,0,0.2), rgba(255,140,0,0.15))',
+            border: '1px solid rgba(255,184,0,0.3)',
+            color: '#FFB800',
+          }}
+          category="Nieuw PR"
+          categoryColor="#FFB800"
+          title={pr.exercise_title}
+          sub={`e1RM ${formatKg(pr.oneRepMax.value)} kg · ${pr.oneRepMax.weight_kg} kg × ${pr.oneRepMax.reps} reps`}
+          cardStyle={{ background: 'linear-gradient(135deg, rgba(255,196,0,0.04), rgba(255,140,0,0.02))', border: '1px solid rgba(255,184,0,0.15)' }}
+          onClick={() => onNavigate('oefeningen', { exercise: pr.exercise_title })}
+        />
+      ))}
+
+      {/* Plateaus */}
+      {visiblePlateaus.slice(0, 2).map((p) => (
+        <SignalCard
+          key={p.exercise_title}
+          icon="chart-line"
+          iconStyle={{ background: 'rgba(217,164,65,0.12)', border: '1px solid rgba(217,164,65,0.25)', color: '#D9A441' }}
+          category="Plateau"
+          categoryColor="#D9A441"
+          title={p.exercise_title}
+          sub={`${p.sessions.length}× geen progressie · e1RM ${p.sessions[p.sessions.length - 1]?.e1rm} kg`}
+          cardStyle={{ background: 'rgba(217,164,65,0.03)', border: '1px solid rgba(217,164,65,0.12)' }}
+          onClick={() => onNavigate('oefeningen', { exercise: p.exercise_title })}
+        />
+      ))}
+
+      {/* Disbalans */}
+      {visibleImbalances.map((imb) => {
+        const isHigh = imb.status === 'high'
+        const rgb = isHigh ? '255,75,62' : '217,164,65'
+        const color = isHigh ? 'var(--color-status-high)' : 'var(--color-status-low)'
+        return (
+          <SignalCard
+            key={imb.muscle_group}
+            icon={isHigh ? 'trending-up' : 'trending-down'}
+            iconStyle={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.25)`, color }}
+            category={isHigh ? 'Te veel volume' : 'Te weinig volume'}
+            categoryColor={color}
+            title={imb.muscle_group}
+            sub={`${imb.setCount} sets (min ${imb.min})`}
+            cardStyle={{ background: `rgba(${rgb},0.03)`, border: `1px solid rgba(${rgb},0.12)` }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function SignalCard({ icon, iconStyle, category, categoryColor, title, sub, cardStyle, onClick }) {
+  const content = (
+    <div
+      className="rounded-xl flex items-center gap-3 p-3"
+      style={cardStyle}
+    >
+      {/* Icon */}
+      <div style={{
+        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        ...iconStyle,
+      }}>
+        <i className={`ti ti-${icon}`} style={{ fontSize: 19 }} aria-hidden="true" />
+      </div>
+
+      {/* Tekst */}
+      <div className="flex-1 min-w-0">
+        <span
+          className="font-[var(--font-mono)] text-[8px] uppercase tracking-widest font-bold block mb-0.5"
+          style={{ color: categoryColor }}
+        >
+          {category}
+        </span>
+        <p className="font-[var(--font-display)] font-semibold text-[13px] leading-tight text-[var(--color-text-primary)] truncate">
+          {title}
         </p>
-        <div style={{
-          width: 24, height: 24, borderRadius: 6,
-          background: 'rgba(217,164,65,0.12)',
-          color: '#D9A441',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <i className="ti ti-bell-ringing" style={{ fontSize: 13 }} aria-hidden="true" />
-        </div>
+        <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] leading-tight truncate">
+          {sub}
+        </p>
       </div>
 
-      <div className="flex flex-col">
-
-        {/* Plateaus — gedempt tijdens deload */}
-        {visiblePlateaus.slice(0, 2).map((p) => (
-          <button
-            key={p.exercise_title}
-            onClick={() => onNavigate('rpe')}
-            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
-          >
-            <div className="flex items-center gap-plate-2">
-              <SignalIcon type="warn" icon="minus" />
-              <div>
-                <p className="font-[var(--font-body)] text-sm text-[var(--color-text-primary)]">{p.exercise_title}</p>
-                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  {p.sessions.length} sessies op rij geen progressie · e1RM {p.sessions[p.sessions.length - 1]?.e1rm} kg
-                </p>
-              </div>
-            </div>
-            <SignalBadge label="plateau" color="warn" />
-          </button>
-        ))}
-
-        {/* PRs — feestelijk en prominent */}
-        {recentPRs.slice(0, 3).map((pr) => (
-          <button
-            key={pr.exercise_title}
-            onClick={() => onNavigate('prs')}
-            className="flex items-center justify-between py-plate-2 border-b border-[var(--color-bg)] last:border-0 hover:brightness-110 text-left w-full"
-          >
-            <div className="flex items-center gap-plate-2">
-              <div style={{
-                width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                background: 'linear-gradient(135deg, rgba(255,196,0,0.18), rgba(255,140,0,0.12))',
-                border: '1px solid rgba(255,184,0,0.28)',
-                color: '#FFB800',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <i className="ti ti-medal" style={{ fontSize: 16 }} aria-hidden="true" />
-              </div>
-              <div>
-                <p className="font-[var(--font-body)] text-sm font-semibold text-[var(--color-text-primary)]">
-                  {pr.exercise_title}
-                </p>
-                <p className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-                  e1RM{' '}
-                  <span style={{ color: '#FFB800', fontWeight: 700 }}>
-                    {formatKg(pr.oneRepMax.value)} kg
-                  </span>
-                  {' · '}
-                  {pr.oneRepMax.weight_kg} kg × {pr.oneRepMax.reps} reps
-                </p>
-              </div>
-            </div>
-            <span style={{
-              background: 'linear-gradient(135deg, #FFB800, #FF8C00)',
-              color: 'white',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9,
-              fontWeight: 700,
-              padding: '3px 7px',
-              borderRadius: 4,
-              letterSpacing: '0.06em',
-              flexShrink: 0,
-            }}>
-              PR
-            </span>
-          </button>
-        ))}
-
-      </div>
+      {/* Chevron alleen bij klikbare items */}
+      {onClick && (
+        <i className="ti ti-chevron-right" style={{ fontSize: 13, color: 'var(--color-text-secondary)', flexShrink: 0, opacity: 0.4 }} aria-hidden="true" />
+      )}
     </div>
   )
-}
 
-function SignalIcon({ type, icon }) {
-  const bg = type === 'ok' ? 'rgba(34,197,94,0.1)'
-    : type === 'warn' ? 'rgba(217,164,65,0.1)'
-    : 'rgba(255,75,62,0.1)'
-  const color = type === 'ok' ? 'var(--color-status-ok)'
-    : type === 'warn' ? 'var(--color-status-low)'
-    : 'var(--color-status-high)'
-  return (
-    <div style={{
-      width: 30, height: 30, borderRadius: 8, background: bg, color,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0,
-    }}>
-      <i className={`ti ti-${icon}`} style={{ fontSize: 14 }} aria-hidden="true" />
-    </div>
-  )
-}
-
-function SignalBadge({ label, color }) {
-  const c = color === 'ok' ? 'var(--color-status-ok)'
-    : color === 'warn' ? 'var(--color-status-low)'
-    : 'var(--color-status-high)'
-  return (
-    <span className="font-[var(--font-mono)] text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
-      style={{ background: `${c}18`, color: c }}>
-      {label}
-    </span>
-  )
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="w-full text-left hover:brightness-110 transition-all rounded-xl">
+        {content}
+      </button>
+    )
+  }
+  return content
 }
 
 // ─── Top PRs ──────────────────────────────────────────────────────────────────
