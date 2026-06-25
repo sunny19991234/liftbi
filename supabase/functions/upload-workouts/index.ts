@@ -261,12 +261,18 @@ Deno.serve(async (req: Request) => {
         plannedMatch,
       })
 
-      // AI-analyse triggeren voor sessies vanaf vandaag. Zo kan een
-      // her-upload van de huidige sessie een eerder gemiste analyse alsnog
-      // vullen, zonder historische workouts met terugwerkende kracht te
-      // analyseren. analyze-session is idempotent en slaat over als er al
-      // een ai_analyses-rij voor deze workout bestaat.
-      if (localDate >= todayDate) {
+      // AI-analyse triggeren voor sessies van de afgelopen 7 dagen. Zo worden
+      // ook workouts die gisteren of eerder deze week zijn geüpload geanalyseerd.
+      // analyze-session is idempotent en slaat over als er al een ai_analyses-rij
+      // voor deze workout bestaat.
+      const sevenDaysAgo = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Amsterdam',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+
+      if (localDate >= sevenDaysAgo) {
         try {
           const internalToken = await createInternalToken()
           const analyzeRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-session`, {

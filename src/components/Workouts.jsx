@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchMonthWorkoutsData } from '../lib/workoutsData'
+import { fetchMonthWorkoutsData, fetchMoreWorkouts, fetchPreviousSessionComparison } from '../lib/workoutsData'
 import { getTodayStr } from '../lib/calendarData'
 import { fetchDeloadWeeks, toggleDeloadWeek } from '../lib/deloadData'
 import { getWeekStart } from '../lib/dashboardQueries'
@@ -97,8 +97,11 @@ export default function Workouts() {
   const [year, setYear]   = useState(() => Number(today.slice(0, 4)))
   const [month, setMonth] = useState(() => Number(today.slice(5, 7)))
   const [data, setData]   = useState(null)
+  const [allWorkouts, setAllWorkouts] = useState([])
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [planDialogDate, setPlanDialogDate] = useState(null)
   const [highlightedId, setHighlightedId]   = useState(null)
   const [deloadWeeks, setDeloadWeeks]       = useState([])
@@ -106,22 +109,48 @@ export default function Workouts() {
   const cardRefs = useRef({})
 
   const deloadSet = useMemo(() => new Set(deloadWeeks), [deloadWeeks])
-
   const weeks = useMemo(() => buildCalendarGrid(year, month), [year, month])
+
+  const maxByType = useMemo(() => {
+    const map = new Map()
+    for (const w of allWorkouts) {
+      const label = getSplitLabel(w.title)
+      if (!label) continue
+      map.set(label, Math.max(map.get(label) ?? 0, w.totalVolume))
+    }
+    return map
+  }, [allWorkouts])
 
   async function load() {
     setLoading(true)
+    setError(null)
     try {
       const [result, dlWeeks] = await Promise.all([
         fetchMonthWorkoutsData(year, month),
         fetchDeloadWeeks(),
       ])
       setData(result)
+      setAllWorkouts(result.workouts)
+      setHasMore(result.hasMore)
       setDeloadWeeks(dlWeeks)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleLoadMore() {
+    if (loadingMore) return
+    setLoadingMore(true)
+    try {
+      const more = await fetchMoreWorkouts(year, month, allWorkouts.length)
+      setAllWorkouts((prev) => [...prev, ...more.workouts])
+      setHasMore(more.hasMore)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -138,6 +167,16 @@ export default function Workouts() {
     } finally {
       setTogglingWeek(null)
     }
+  }
+
+  async function handleSkip(plannedId) {
+    if (!plannedId) return
+    const { error: updateError } = await supabase
+      .from('planned_workouts')
+      .update({ status: 'skipped' })
+      .eq('id', plannedId)
+    if (updateError) { setError(updateError.message); return }
+    load()
   }
 
   useEffect(() => { load() }, [year, month]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -158,15 +197,25 @@ export default function Workouts() {
   }
 
   async function handlePlanSubmit(title, notes) {
-    const { error: insertError } = await supabase.from('planned_workouts').insert({
-      planned_date: planDialogDate,
-      title,
-      notes: notes || null,
-      status: 'planned',
-    })
-    if (insertError) { setError(insertError.message); return }
+    const { error: upsertError } = await supabase
+      .from('planned_workouts')
+      .upsert(
+        { planned_date: planDialogDate, title, notes: notes || null, status: 'planned' },
+        { onConflict: 'planned_date,title' }
+      )
+    if (upsertError) { setError(upsertError.message); return }
+
+    // Navigate to the month of the planned date if different from current view
+    const plannedDate = new Date(planDialogDate + 'T12:00:00')
+    const plannedYear = plannedDate.getFullYear()
+    const plannedMonth = plannedDate.getMonth() + 1
     setPlanDialogDate(null)
-    load()
+    if (plannedYear !== year || plannedMonth !== month) {
+      setYear(plannedYear)
+      setMonth(plannedMonth)
+    } else {
+      load()
+    }
   }
 
   if (error) {
@@ -180,7 +229,7 @@ export default function Workouts() {
   return (
     <div className="max-w-6xl mx-auto px-plate-3 py-plate-3 sm:px-plate-4 sm:py-plate-4 flex flex-col md:flex-row gap-plate-4 sm:gap-plate-6 items-start">
 
-      {/* ── Linkerkolom: kalender ─────────────────────────────── */}
+      {/* ── Linkerkolom: kalender ─────────────────────────── */}
       <div className="w-full md:w-72 flex-shrink-0 flex flex-col gap-plate-3">
 
         {/* Maand navigatie */}
@@ -202,7 +251,6 @@ export default function Workouts() {
 
         {/* Kalender grid */}
         <div className="flex flex-col gap-0.5">
-          {/* Header rij: spatie voor toggle-kolom + dag-labels */}
           <div className="grid gap-0.5" style={{ gridTemplateColumns: '22px repeat(7, 1fr)' }}>
             <div />
             {WEEKDAY_LABELS.map((d) => (
@@ -242,6 +290,7 @@ export default function Workouts() {
                         isDeload={isDeload}
                         onPlanClick={() => setPlanDialogDate(dateStr)}
                         onDoneClick={handleCalendarDoneClick}
+                        onSkip={handleSkip}
                       />
                     ))}
                   </div>
@@ -262,8 +311,9 @@ export default function Workouts() {
           </div>
           <div className="flex flex-wrap gap-x-plate-3 gap-y-1">
             {[
-              { color: 'bg-[var(--color-data)]/30',         label: 'Gepland' },
-              { color: 'bg-[var(--color-status-high)]/30',  label: 'Gemist'  },
+              { color: 'bg-[var(--color-data)]/30',                  label: 'Gepland'      },
+              { color: 'bg-[var(--color-status-high)]/30',            label: 'Gemist'       },
+              { color: 'bg-[var(--color-text-secondary)]/20',         label: 'Overgeslagen' },
             ].map((it) => (
               <div key={it.label} className="flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-sm ${it.color}`} />
@@ -293,17 +343,32 @@ export default function Workouts() {
           <p className="text-[var(--color-text-secondary)] font-[var(--font-mono)] text-sm">Laden...</p>
         )}
 
-        {!loading && !data?.workouts?.length && (
+        {!loading && !allWorkouts.length && (
           <p className="text-[var(--color-text-secondary)] font-[var(--font-body)] text-sm">
             Geen workouts gevonden voor {MONTH_LABELS[month - 1]} {year}.
           </p>
         )}
 
-        {!loading && data?.workouts?.map((workout) => (
+        {!loading && allWorkouts.map((workout) => (
           <div key={workout.id} ref={(el) => { cardRefs.current[workout.id] = el }}>
-            <WorkoutCard workout={workout} highlighted={highlightedId === workout.id} />
+            <WorkoutCard
+              workout={workout}
+              highlighted={highlightedId === workout.id}
+              maxByType={maxByType}
+            />
           </div>
         ))}
+
+        {hasMore && !loading && (
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="self-center px-plate-4 py-plate-2 rounded-lg text-sm font-[var(--font-body)] bg-[var(--color-card)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-40"
+          >
+            {loadingMore ? 'Laden...' : 'Meer laden'}
+          </button>
+        )}
       </div>
 
       {planDialogDate && (
@@ -341,19 +406,23 @@ function WeekToggleBtn({ weekStart, isDeload, toggling, onToggle }) {
 
 // ─── CompactDayCell ───────────────────────────────────────────────────────────
 
-function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick }) {
+function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick, onSkip }) {
+  const [showSkipMenu, setShowSkipMenu] = useState(false)
+
   if (!dateStr) return <div className="aspect-square" />
 
   const dayNum = Number(dateStr.slice(8, 10))
   const isDone = info?.type === 'done'
   const isPlanned = info?.type === 'planned'
-  const isClickable = !info || isDone || (isPlanned && info.status === 'planned')
+  const isMissed = isPlanned && info.status === 'missed'
+  const isSkipped = isPlanned && info.status === 'skipped'
+  const isClickable = !info || isDone || (isPlanned && info.status === 'planned') || isMissed
 
   let bgClass = isDeload ? 'bg-[rgba(217,164,65,0.08)]' : 'bg-[var(--color-card)]'
-  if (isDone)                                              bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
-  else if (isPlanned && info.status === 'planned')         bgClass = 'bg-[var(--color-data)]/[0.08]'
-  else if (isPlanned && info.status === 'missed')          bgClass = 'bg-[var(--color-status-high)]/[0.08]'
-  else if (isPlanned && info.status === 'skipped')         bgClass = 'bg-[var(--color-card)] opacity-50'
+  if (isDone)                                bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
+  else if (isPlanned && info.status === 'planned') bgClass = 'bg-[var(--color-data)]/[0.08]'
+  else if (isMissed)                         bgClass = 'bg-[var(--color-status-high)]/[0.08]'
+  else if (isSkipped)                        bgClass = 'bg-[var(--color-text-secondary)]/[0.08] opacity-50'
 
   const splitStyle = isDone ? getSplitStyle(info.title) : null
   const splitLabel = isDone ? getSplitLabel(info.title) : null
@@ -362,8 +431,9 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
     : 0
 
   function handleClick() {
-    if (isDone) onDoneClick(info.workoutId)
-    else if (isClickable) onPlanClick()
+    if (isDone) { onDoneClick(info.workoutId); return }
+    if (isMissed) { setShowSkipMenu((v) => !v); return }
+    if (isClickable) onPlanClick()
   }
 
   return (
@@ -374,7 +444,7 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
         isToday ? 'ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-bg)]' : ''
       } ${isClickable ? 'cursor-pointer hover:brightness-125' : ''}`}
     >
-      {/* Volume-bar bovenaan, gekleurd naar split (amber bij deload) */}
+      {/* Volume-bar bovenaan */}
       {isDone && (
         <div
           className="absolute top-0 left-0 h-0.5"
@@ -415,27 +485,75 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
         {isPlanned && (
           <div className="flex-1 flex items-end pb-0.5">
             <span className={`text-[8px] font-[var(--font-body)] leading-tight ${
-              info.status === 'missed' ? 'text-[var(--color-status-high)]' : 'text-[var(--color-data)]'
+              isMissed ? 'text-[var(--color-status-high)]'
+              : isSkipped ? 'text-[var(--color-text-secondary)]'
+              : 'text-[var(--color-data)]'
             }`}>
               {getSplitLabel(info.title) ?? info.title?.slice(0, 4)}
             </span>
           </div>
         )}
       </div>
+
+      {/* Skip menu overlay voor gemiste sessies */}
+      {showSkipMenu && isMissed && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-md"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="text-[7px] font-[var(--font-body)] text-[var(--color-text-secondary)] bg-[var(--color-card)] rounded px-1 py-0.5 leading-tight hover:text-[var(--color-text-primary)] transition-colors"
+            onClick={(e) => { e.stopPropagation(); onSkip(info.plannedId); setShowSkipMenu(false) }}
+          >
+            Overgeslagen
+          </button>
+        </div>
+      )}
     </button>
   )
 }
 
 // ─── WorkoutCard ──────────────────────────────────────────────────────────────
 
-function WorkoutCard({ workout, highlighted }) {
+function WorkoutCard({ workout, highlighted, maxByType }) {
   const [showExercises, setShowExercises] = useState(false)
   const [showAnalysis, setShowAnalysis]   = useState(false)
+  const [showComparison, setShowComparison] = useState(false)
+  const [comparisonData, setComparisonData] = useState(undefined)
+  const [loadingComparison, setLoadingComparison] = useState(false)
 
   const splitStyle = getSplitStyle(workout.title)
   const splitLabel = getSplitLabel(workout.title)
-  const hasAnalysis = workout.analysis != null
   const dur = formatDuration(workout.durationMin)
+
+  const maxForType = splitLabel ? (maxByType?.get(splitLabel) ?? 0) : 0
+  const volumePct = maxForType > 0
+    ? Math.min(100, Math.round((workout.totalVolume / maxForType) * 100))
+    : 0
+
+  const rpeColor = workout.avgRpe == null
+    ? 'var(--color-text-secondary)'
+    : workout.avgRpe >= 8.5 ? '#FF4B3E'
+    : workout.avgRpe >= 7.5 ? '#D9A441'
+    : '#22C55E'
+
+  async function handleComparisonToggle() {
+    if (comparisonData !== undefined) {
+      setShowComparison((v) => !v)
+      return
+    }
+    setShowComparison(true)
+    setLoadingComparison(true)
+    try {
+      const result = await fetchPreviousSessionComparison(workout.id, workout.title)
+      setComparisonData(result ?? null)
+    } catch {
+      setComparisonData(null)
+    } finally {
+      setLoadingComparison(false)
+    }
+  }
 
   return (
     <div
@@ -444,6 +562,17 @@ function WorkoutCard({ workout, highlighted }) {
       }`}
       style={splitStyle ? { borderLeft: `4px solid ${splitStyle.color}` } : {}}
     >
+      {/* Volume balk per split-type */}
+      {maxForType > 0 && (
+        <div style={{
+          height: 3,
+          width: `${volumePct}%`,
+          background: splitStyle?.color ?? 'var(--color-text-secondary)',
+          borderRadius: '2px 2px 0 0',
+          transition: 'width 0.4s ease-out',
+        }} />
+      )}
+
       <div className="p-plate-3 flex flex-col gap-plate-2">
         {/* Titel + badge + datum */}
         <div className="flex items-start gap-plate-2 flex-wrap">
@@ -474,26 +603,23 @@ function WorkoutCard({ workout, highlighted }) {
             <MetricPill
               label="Gem. RPE"
               value={`${workout.avgRpe}`}
-              valueColor={
-                workout.avgRpe >= 9 ? 'var(--color-status-high)'
-                : workout.avgRpe >= 8 ? 'var(--color-status-low)'
-                : '#3E7CB1'
-              }
+              valueColor={rpeColor}
             />
           )}
         </div>
 
         {/* Toggle knoppen */}
-        <div className="flex gap-plate-2 pt-plate-1">
+        <div className="flex gap-plate-2 pt-plate-1 flex-wrap">
           <ToggleButton active={showExercises} onClick={() => setShowExercises((v) => !v)}>
             {showExercises ? '▲' : '▼'} Oefeningen
           </ToggleButton>
-          <ToggleButton
-            active={showAnalysis}
-            onClick={() => setShowAnalysis((v) => !v)}
-            disabled={!hasAnalysis}
-          >
-            {showAnalysis ? '▲' : '▼'} AI Analyse{!hasAnalysis ? ' (geen)' : ''}
+          {workout.hasAnalysis && (
+            <ToggleButton active={showAnalysis} onClick={() => setShowAnalysis((v) => !v)}>
+              {showAnalysis ? '▲' : '▼'} AI Analyse
+            </ToggleButton>
+          )}
+          <ToggleButton active={showComparison} onClick={handleComparisonToggle}>
+            {showComparison ? '▲' : '▼'} vs vorige {workout.title}
           </ToggleButton>
         </div>
       </div>
@@ -515,6 +641,17 @@ function WorkoutCard({ workout, highlighted }) {
             model={workout.analysis.model}
             createdAt={workout.analysis.created_at}
           />
+        </div>
+      )}
+
+      {/* Vergelijking met vorige sessie */}
+      {showComparison && (
+        <div className="border-t border-[var(--color-bg)] px-plate-3 pb-plate-3 pt-plate-2">
+          {loadingComparison ? (
+            <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-mono)]">Laden...</p>
+          ) : (
+            <ComparisonSection prevDate={comparisonData?.prevDate} comparison={comparisonData?.comparison} />
+          )}
         </div>
       )}
     </div>
@@ -553,6 +690,71 @@ function ToggleButton({ active, onClick, disabled, children }) {
     >
       {children}
     </button>
+  )
+}
+
+// ─── ComparisonSection ────────────────────────────────────────────────────────
+
+function ComparisonSection({ prevDate, comparison }) {
+  if (!comparison) {
+    return (
+      <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-body)]">
+        Geen vorige sessie gevonden.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-plate-2">
+      <p className="text-[10px] font-[var(--font-body)] uppercase tracking-wide text-[var(--color-text-secondary)]">
+        vs {formatDate(prevDate)}
+      </p>
+      <div className="flex flex-col gap-1">
+        {Array.from(comparison.entries()).map(([name, delta]) => {
+          const wPos = delta.deltaWeight != null && delta.deltaWeight > 0
+          const wNeg = delta.deltaWeight != null && delta.deltaWeight < 0
+          const vPos = delta.deltaVolume > 0
+          const vNeg = delta.deltaVolume < 0
+          const e1rmDelta = delta.currE1rm != null && delta.prevE1rm != null
+            ? Math.round((delta.currE1rm - delta.prevE1rm) * 10) / 10
+            : null
+
+          return (
+            <div key={name} className="flex items-center gap-2 flex-wrap py-0.5 border-b border-[var(--color-bg)] last:border-0">
+              <span className="text-xs font-[var(--font-body)] text-[var(--color-text-primary)] flex-1 min-w-0 truncate">
+                {name}
+              </span>
+              {delta.deltaWeight !== null ? (
+                <span className={`text-xs font-[var(--font-mono)] tabular-data flex-shrink-0 ${
+                  wPos ? 'text-[var(--color-status-ok)]' : wNeg ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-secondary)]'
+                }`}>
+                  {wPos ? '+' : ''}{delta.deltaWeight.toFixed(1).replace('.', ',')} kg {wPos ? '↑' : wNeg ? '↓' : '='}
+                </span>
+              ) : null}
+              <span className={`text-xs font-[var(--font-mono)] tabular-data flex-shrink-0 ${
+                vPos ? 'text-[var(--color-status-ok)]' : vNeg ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-secondary)]'
+              }`}>
+                {vPos ? '↑' : vNeg ? '↓' : '='} {Math.abs(delta.deltaVolume)} kg vol.
+              </span>
+              {delta.currE1rm != null && (
+                <span className="text-[10px] font-[var(--font-mono)] tabular-data flex-shrink-0 text-[var(--color-text-secondary)]">
+                  e1RM {delta.currE1rm}
+                  {e1rmDelta !== null && (
+                    <span className={
+                      e1rmDelta > 0 ? 'text-[var(--color-status-ok)]' :
+                      e1rmDelta < 0 ? 'text-[var(--color-status-high)]' :
+                      'text-[var(--color-text-secondary)]'
+                    }>
+                      {' '}({e1rmDelta > 0 ? '+' : ''}{e1rmDelta})
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -619,7 +821,6 @@ function AIAnalysisSection({ content, model, createdAt }) {
   return (
     <div className="flex flex-col gap-plate-3">
 
-      {/* Samenvatting */}
       <div>
         <SectionLabel>Samenvatting</SectionLabel>
         <p className="text-sm font-[var(--font-body)] text-[var(--color-text-primary)] leading-relaxed">
@@ -630,7 +831,6 @@ function AIAnalysisSection({ content, model, createdAt }) {
         </p>
       </div>
 
-      {/* Scores */}
       {content.scores && Object.keys(content.scores).length > 0 && (
         <div>
           <SectionLabel>Scores</SectionLabel>
@@ -652,7 +852,6 @@ function AIAnalysisSection({ content, model, createdAt }) {
         </div>
       )}
 
-      {/* Per oefening */}
       {(content.exercises ?? []).length > 0 && (
         <div>
           <SectionLabel>Per oefening</SectionLabel>
@@ -676,7 +875,6 @@ function AIAnalysisSection({ content, model, createdAt }) {
         </div>
       )}
 
-      {/* Weekoverzicht spiergroepen */}
       {(content.weekly_overview ?? []).length > 0 && (
         <div>
           <SectionLabel>Weekoverzicht per spiergroep</SectionLabel>
@@ -703,7 +901,6 @@ function AIAnalysisSection({ content, model, createdAt }) {
         </div>
       )}
 
-      {/* Aanbevelingen */}
       {(content.recommendations ?? []).length > 0 && (
         <div>
           <SectionLabel>Aanbevelingen</SectionLabel>
