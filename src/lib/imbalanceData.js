@@ -16,11 +16,20 @@
 import { fetchSetsWithMuscleGroups, fetchVolumeTargets, getWeekStart } from './dashboardQueries'
 import { getTodayStr } from './calendarData'
 
+const SPLIT_MUSCLE_MAP = {
+  Push:  ['Borst', 'Schouders', 'Triceps'],
+  Pull:  ['Rug', 'Biceps', 'Forearms'],
+  Legs:  ['Benen'],
+  Upper: ['Borst', 'Rug', 'Schouders', 'Biceps', 'Triceps'],
+}
+
 /**
  * Return: [{ muscle_group, setCount, min, max, status: 'low' | 'high' }]
  * gesorteerd op grootste afwijking eerst.
+ *
+ * @param {Array<{title: string, planned_date: string}>} upcomingPlanned
  */
-export async function detectImbalances() {
+export async function detectImbalances(upcomingPlanned = []) {
   const [sets, targets] = await Promise.all([
     fetchSetsWithMuscleGroups(3), // ruim genoeg venster; we filteren hieronder alsnog exact op huidige week
     fetchVolumeTargets(),
@@ -56,6 +65,24 @@ export async function detectImbalances() {
       distance = setCount - target.max_sets_per_week
     }
     if (status) {
+      // Signalen voor 'high' zijn altijd relevant; onderdruk alleen 'low'-signalen
+      if (status === 'low') {
+        // Voorwaarde 1: geplande sessie deze week die spiergroep aanspreekt?
+        const covered = upcomingPlanned.some((p) => {
+          const muscles = SPLIT_MUSCLE_MAP[p.title] ?? []
+          return muscles.includes(target.muscle_group)
+        })
+        if (covered) continue
+
+        // Voorwaarde 2: achterstand op weekpace (ma=1 … zo=7, UTC)
+        const todayUtc = new Date(getTodayStr() + 'T00:00:00Z')
+        const rawDay = todayUtc.getUTCDay() // 0=zo
+        const dayOfWeek = rawDay === 0 ? 7 : rawDay // ma=1 … zo=7
+        const weekProgress = dayOfWeek / 7
+        const paceThreshold = target.min_sets_per_week * weekProgress * 0.6
+        if (setCount >= paceThreshold) continue
+      }
+
       results.push({
         muscle_group: target.muscle_group,
         setCount,

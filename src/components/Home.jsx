@@ -117,13 +117,12 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setNextPlanned(next)
 
       // Daarna alles parallel, readiness nu met het juiste workout-type
-      const [strip, vol, prevVol, plateauList, imbalanceList, allPRs, readinessData, streakData, recentWos, upcomingWos, dlWeeks] =
+      const [strip, vol, prevVol, plateauList, allPRs, readinessData, streakData, recentWos, upcomingWos, dlWeeks] =
         await Promise.all([
           fetchDayStrip(),
           fetchWeekVolume(),
           fetchPreviousWeekVolume(dayOfWeek),
           detectPlateaus(),
-          detectImbalances(),
           calculateAllPRs(),
           calculateReadinessScore(next?.title),
           calculateStreak(3),
@@ -131,6 +130,8 @@ export default function Home({ onNavigate, onTokenExpired }) {
           fetchUpcomingPlanned(4),
           fetchDeloadWeeks(),
         ])
+
+      const imbalanceList = await detectImbalances(upcomingWos)
 
       setDayStrip(strip)
       setWeekVolume(vol)
@@ -697,24 +698,20 @@ function AdviceRow({ advice }) {
         } : {}),
       }}
     >
-      <div className="flex items-center gap-1.5 mb-1">
+      {/* Regel 1: naam links + badge rechts */}
+      <div className="flex items-center justify-between gap-1.5 mb-0.5">
+        <span className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)] truncate">
+          {isGrouped ? `${exercises.length} oefeningen` : exercises[0]}
+        </span>
         <span
-          className="font-[var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm"
+          className="font-[var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm flex-shrink-0"
           style={{ background: `${color}22`, color, fontWeight: 700, letterSpacing: '0.04em' }}
         >
           {label}
         </span>
-        <span className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)] truncate">
-          {isGrouped ? `${exercises.length} oefeningen` : exercises[0]}
-        </span>
       </div>
 
-      {isGrouped && (
-        <p className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)] mb-0.5 truncate">
-          {exercises.slice(0, 4).join(' · ')}{exercises.length > 4 ? ' …' : ''}
-        </p>
-      )}
-
+      {/* Regel 2: huidig → doel */}
       {targetStr && (
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
@@ -727,6 +724,14 @@ function AdviceRow({ advice }) {
         </div>
       )}
 
+      {/* Regel 3: oefening-chips bij grouped rows */}
+      {isGrouped && (
+        <p className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)] mb-0.5">
+          {exercises.slice(0, 3).join(' · ')}{exercises.length > 3 ? ` +${exercises.length - 3} meer` : ''}
+        </p>
+      )}
+
+      {/* Regel 4: uitlegzin */}
       <p className="font-[var(--font-mono)] text-[9px]" style={{ color: `${color}99` }}>
         {advice.advice}
       </p>
@@ -765,6 +770,11 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDel
       {/* Icon rechtsboven */}
       <div style={{ position: 'absolute', top: 8, right: 10 }}>
         <i className="ti ti-chart-bar" style={{ fontSize: 15, color: isCurrentDeload ? '#D9A441' : 'var(--color-accent)', opacity: 0.6 }} aria-hidden="true" />
+      </div>
+
+      {/* Pijl rechtsonder — visuele hint dat de kaart klikbaar is */}
+      <div style={{ position: 'absolute', bottom: 8, right: 10 }}>
+        <i className="ti ti-arrow-right" style={{ fontSize: 12, color: 'var(--color-text-secondary)', opacity: 0.4 }} aria-hidden="true" />
       </div>
 
       {/* Header met optionele deload badge */}
@@ -810,7 +820,7 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDel
             )}
             <span style={{ color: 'var(--color-border)', fontSize: 9 }}>·</span>
             <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-              {weekVolume.setCount} sets
+              {weekVolume.workoutCount != null ? `${weekVolume.workoutCount}× · ` : ''}{weekVolume.setCount} sets
             </span>
           </div>
 
@@ -843,7 +853,7 @@ function WeekComparisonCard({ weekVolume, prevWeekVolume, bestWeek, isCurrentDel
                   <>
                     <span style={{ color: 'var(--color-border)', fontSize: 9 }}>·</span>
                     <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)]">
-                      {prevWeekVolume.setCount} sets
+                      {prevWeekVolume.workoutCount != null ? `${prevWeekVolume.workoutCount}× · ` : ''}{prevWeekVolume.setCount} sets
                     </span>
                   </>
                 )}

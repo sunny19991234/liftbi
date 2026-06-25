@@ -111,7 +111,7 @@ async function fetchVolumeForWeek(weekStartDate, maxDaysFromStart = 6) {
   if (wErr) throw wErr
 
   if (workouts.length === 0) {
-    return { setCount: 0, volumeKg: 0, avgRpe: null, weekStart: weekStartDate, weekEnd: weekEndDate }
+    return { setCount: 0, volumeKg: 0, avgRpe: null, workoutCount: 0, weekStart: weekStartDate, weekEnd: weekEndDate }
   }
 
   const { data: sets, error: sErr } = await supabase
@@ -134,6 +134,7 @@ async function fetchVolumeForWeek(weekStartDate, maxDaysFromStart = 6) {
     setCount,
     volumeKg: Math.round(volumeKg),
     avgRpe: rpeCount > 0 ? Math.round((rpeSum / rpeCount) * 10) / 10 : null,
+    workoutCount: workouts.length,
     weekStart: weekStartDate,
     weekEnd: weekEndDate,
   }
