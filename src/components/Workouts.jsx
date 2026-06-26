@@ -705,55 +705,80 @@ function ComparisonSection({ prevDate, comparison }) {
   }
 
   return (
-    <div className="flex flex-col gap-plate-2">
+    <div className="flex flex-col gap-1">
       <p className="text-[10px] font-[var(--font-body)] uppercase tracking-wide text-[var(--color-text-secondary)]">
         vs {formatDate(prevDate)}
       </p>
-      <div className="flex flex-col gap-1">
-        {Array.from(comparison.entries()).map(([name, delta]) => {
-          const wPos = delta.deltaWeight != null && delta.deltaWeight > 0
-          const wNeg = delta.deltaWeight != null && delta.deltaWeight < 0
-          const vPos = delta.deltaVolume > 0
-          const vNeg = delta.deltaVolume < 0
-          const e1rmDelta = delta.currE1rm != null && delta.prevE1rm != null
-            ? Math.round((delta.currE1rm - delta.prevE1rm) * 10) / 10
-            : null
 
-          return (
-            <div key={name} className="flex items-center gap-2 flex-wrap py-0.5 border-b border-[var(--color-bg)] last:border-0">
-              <span className="text-xs font-[var(--font-body)] text-[var(--color-text-primary)] flex-1 min-w-0 truncate">
-                {name}
-              </span>
-              {delta.deltaWeight !== null ? (
-                <span className={`text-xs font-[var(--font-mono)] tabular-data flex-shrink-0 ${
-                  wPos ? 'text-[var(--color-status-ok)]' : wNeg ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-secondary)]'
-                }`}>
-                  {wPos ? '+' : ''}{delta.deltaWeight.toFixed(1).replace('.', ',')} kg {wPos ? '↑' : wNeg ? '↓' : '='}
-                </span>
-              ) : null}
-              <span className={`text-xs font-[var(--font-mono)] tabular-data flex-shrink-0 ${
-                vPos ? 'text-[var(--color-status-ok)]' : vNeg ? 'text-[var(--color-status-high)]' : 'text-[var(--color-text-secondary)]'
-              }`}>
-                {vPos ? '↑' : vNeg ? '↓' : '='} {Math.abs(delta.deltaVolume)} kg vol.
-              </span>
-              {delta.currE1rm != null && (
-                <span className="text-[10px] font-[var(--font-mono)] tabular-data flex-shrink-0 text-[var(--color-text-secondary)]">
-                  e1RM {delta.currE1rm}
-                  {e1rmDelta !== null && (
-                    <span className={
-                      e1rmDelta > 0 ? 'text-[var(--color-status-ok)]' :
-                      e1rmDelta < 0 ? 'text-[var(--color-status-high)]' :
-                      'text-[var(--color-text-secondary)]'
-                    }>
-                      {' '}({e1rmDelta > 0 ? '+' : ''}{e1rmDelta})
-                    </span>
-                  )}
+      <div
+        className="grid gap-x-2 border-b border-[var(--color-border-subtle)] pb-1 mb-0.5"
+        style={{ gridTemplateColumns: '1fr 56px 72px 80px' }}
+      >
+        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">Oefening</span>
+        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">Δ kg</span>
+        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">Vol.</span>
+        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">e1RM</span>
+      </div>
+
+      {Array.from(comparison.entries()).map(([name, delta]) => (
+        <ExerciseComparisonRow key={name} name={name} delta={delta} />
+      ))}
+    </div>
+  )
+}
+
+function ExerciseComparisonRow({ name, delta }) {
+  const wPos = delta.deltaWeight != null && delta.deltaWeight > 0
+  const wNeg = delta.deltaWeight != null && delta.deltaWeight < 0
+  const vPos = delta.deltaVolume > 0
+  const vNeg = delta.deltaVolume < 0
+  const e1rmDelta = delta.currE1rm != null && delta.prevE1rm != null
+    ? Math.round((delta.currE1rm - delta.prevE1rm) * 10) / 10
+    : null
+
+  return (
+    <div
+      className="grid gap-x-2 py-1.5 border-b border-[var(--color-bg)] last:border-0 items-center"
+      style={{ gridTemplateColumns: '1fr 56px 72px 80px' }}
+    >
+      <span className="text-xs font-[var(--font-body)] text-[var(--color-text-primary)] truncate min-w-0">
+        {name}
+      </span>
+
+      <span className={`text-xs font-[var(--font-mono)] tabular-data text-right ${
+        delta.deltaWeight == null ? 'text-[var(--color-text-tertiary)]'
+        : wPos ? 'text-[var(--color-status-ok)]'
+        : wNeg ? 'text-[var(--color-status-high)]'
+        : 'text-[var(--color-text-secondary)]'
+      }`}>
+        {delta.deltaWeight == null
+          ? '—'
+          : wPos ? `+${delta.deltaWeight.toFixed(1).replace('.', ',')} ↑`
+          : wNeg ? `${delta.deltaWeight.toFixed(1).replace('.', ',')} ↓`
+          : `= ${delta.deltaWeight.toFixed(1).replace('.', ',')}`}
+      </span>
+
+      <span className={`text-xs font-[var(--font-mono)] tabular-data text-right ${
+        vPos ? 'text-[var(--color-status-ok)]'
+        : vNeg ? 'text-[var(--color-status-high)]'
+        : 'text-[var(--color-text-secondary)]'
+      }`}>
+        {vPos ? `↑ ${delta.deltaVolume}` : vNeg ? `↓ ${Math.abs(delta.deltaVolume)}` : `= 0`} kg
+      </span>
+
+      <span className="text-xs font-[var(--font-mono)] tabular-data text-right">
+        {delta.currE1rm == null
+          ? <span className="text-[var(--color-text-tertiary)]">—</span>
+          : <>
+              <span className="text-[var(--color-text-secondary)]">{delta.currE1rm}</span>
+              {e1rmDelta != null && e1rmDelta !== 0 && (
+                <span className={`text-[10px] ${e1rmDelta > 0 ? 'text-[var(--color-status-ok)]' : 'text-[var(--color-status-high)]'}`}>
+                  {' '}{e1rmDelta > 0 ? '+' : ''}{e1rmDelta}
                 </span>
               )}
-            </div>
-          )
-        })}
-      </div>
+            </>
+        }
+      </span>
     </div>
   )
 }

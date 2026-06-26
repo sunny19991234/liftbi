@@ -12,6 +12,7 @@
 // 7. Upload (klein)   — utility, onderaan, niet prominent
 
 import { useEffect, useRef, useState } from 'react'
+import CoachAdviceCard from './CoachAdviceCard'
 import {
   fetchNextPlanned,
   fetchDayStrip,
@@ -49,13 +50,6 @@ function formatDate(dateStr) {
   return `${day}-${month}-${year}`
 }
 
-function formatDateHuman(dateStr) {
-  if (!dateStr) return ''
-  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-  const [, month, day] = dateStr.split('-')
-  return `${parseInt(day)} ${months[parseInt(month) - 1]}`
-}
-
 // ─── Kleur-helpers ────────────────────────────────────────────────────────────
 
 function readinessColor(score) {
@@ -63,28 +57,6 @@ function readinessColor(score) {
   if (score >= 6) return '#3E7CB1'
   if (score >= 4) return 'var(--color-status-low)'
   return 'var(--color-status-high)'
-}
-
-function actionColor(action) {
-  switch (action) {
-    case 'gewicht_omhoog': return 'var(--color-status-ok)'
-    case 'reps_omhoog':    return '#3E7CB1'
-    case 'handhaven':      return 'var(--color-text-secondary)'
-    case 'consolideren':   return 'var(--color-status-low)'
-    case 'gewicht_omlaag': return 'var(--color-status-high)'
-    default:               return 'var(--color-text-secondary)'
-  }
-}
-
-function actionLabel(action) {
-  switch (action) {
-    case 'gewicht_omhoog': return '↑ gewicht'
-    case 'reps_omhoog':    return '↑ reps'
-    case 'handhaven':      return '= handhaven'
-    case 'consolideren':   return '~ consolideer'
-    case 'gewicht_omlaag': return '↓ gewicht'
-    default:               return '—'
-  }
 }
 
 // ─── Hoofd-component ──────────────────────────────────────────────────────────
@@ -223,7 +195,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
             onNavigate={onNavigate}
           />
           {coachAdvice && coachAdvice.advices.length > 0 && (
-            <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
+            <CoachAdviceCard advice={coachAdvice} />
           )}
         </div>
 
@@ -600,141 +572,6 @@ function StreakCard({ streak }) {
         <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">4w geleden</span>
         <span className="font-[var(--font-mono)] text-[8px] text-[var(--color-text-secondary)]">vandaag</span>
       </div>
-    </div>
-  )
-}
-
-// ─── Coach-advies ─────────────────────────────────────────────────────────────
-
-function groupAdvices(list) {
-  const grouped = []
-  const seen = new Map()
-  for (const a of list) {
-    const key = `${a.action}::${a.advice}`
-    if (seen.has(key)) {
-      seen.get(key).exercises.push(a.exercise_title)
-    } else {
-      const entry = { ...a, exercises: [a.exercise_title] }
-      seen.set(key, entry)
-      grouped.push(entry)
-    }
-  }
-  return grouped
-}
-
-function CoachAdviceCard({ advice, onNavigate }) {
-  const [expanded, setExpanded] = useState(false)
-  const { workoutTitle, date, advices } = advice
-
-  const actionable = groupAdvices(advices.filter((a) => ['gewicht_omhoog', 'reps_omhoog'].includes(a.action)))
-  const maintain   = groupAdvices(advices.filter((a) => !['gewicht_omhoog', 'reps_omhoog'].includes(a.action)))
-  const allGrouped = [...actionable, ...maintain]
-
-  const VISIBLE_MAX = 3
-  const hasMore = allGrouped.length > VISIBLE_MAX
-  const visible = expanded ? allGrouped : allGrouped.slice(0, VISIBLE_MAX)
-
-  return (
-    <div className="surface rounded-xl overflow-hidden" style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 10 }}>
-        <i className="ti ti-brain" style={{ fontSize: 16, color: 'var(--color-status-ok)', opacity: 0.6 }} aria-hidden="true" />
-      </div>
-      <div className="p-plate-3">
-        <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-widest text-[var(--color-status-ok)] mb-plate-2">
-          voor volgende {workoutTitle} · gebaseerd op {formatDateHuman(date)}
-        </p>
-        <div className="flex flex-col">
-          {visible.map((a) => (
-            <AdviceRow key={`${a.action}:${a.exercises[0]}`} advice={a} />
-          ))}
-        </div>
-        {hasMore && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="mt-2 font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-          >
-            {expanded ? '↑ minder' : `↓ ${allGrouped.length - VISIBLE_MAX} meer`}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function AdviceRow({ advice }) {
-  const color = actionColor(advice.action)
-  const label = actionLabel(advice.action)
-  const { bestSet, repRange, targetWeight, targetReps, action, exercises } = advice
-  const isGrouped = exercises.length > 1
-
-  let targetStr = ''
-  if (!isGrouped) {
-    if (action === 'gewicht_omhoog' && targetWeight) {
-      targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
-    } else if (action === 'reps_omhoog') {
-      targetStr = `${bestSet.weight_kg} kg × ${targetReps || `${repRange.min}–${repRange.max}`}`
-    } else if (action === 'handhaven' || action === 'consolideren') {
-      targetStr = `${bestSet.weight_kg} kg × ${repRange.min}–${repRange.max}`
-    } else if (action === 'gewicht_omlaag' && targetWeight) {
-      targetStr = `${targetWeight} kg × ${repRange.min}–${repRange.max}`
-    }
-  }
-
-  const isDownward = action === 'gewicht_omlaag'
-
-  return (
-    <div
-      className="py-2.5 border-b border-[var(--color-bg)] last:border-0"
-      style={{
-        paddingLeft: 10,
-        borderLeft: `3px solid ${color}`,
-        ...(isDownward ? {
-          background: 'rgba(255,75,62,0.08)',
-          borderRadius: 6,
-          borderTop: '1px solid rgba(255,75,62,0.25)',
-          borderRight: '1px solid rgba(255,75,62,0.25)',
-          borderBottom: '1px solid rgba(255,75,62,0.25)',
-          marginBottom: 4,
-        } : {}),
-      }}
-    >
-      {/* Regel 1: naam links + badge rechts */}
-      <div className="flex items-center justify-between gap-1.5 mb-0.5">
-        <span className="font-[var(--font-body)] text-sm font-medium text-[var(--color-text-primary)] truncate">
-          {isGrouped ? `${exercises.length} oefeningen` : exercises[0]}
-        </span>
-        <span
-          className="font-[var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm flex-shrink-0"
-          style={{ background: `${color}22`, color, fontWeight: 700, letterSpacing: '0.04em' }}
-        >
-          {label}
-        </span>
-      </div>
-
-      {/* Regel 2: huidig → doel */}
-      {targetStr && (
-        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-text-secondary)]">
-            {bestSet.weight_kg} kg × {bestSet.reps}{bestSet.rpe != null ? ` · RPE ${bestSet.rpe}` : ''}
-          </span>
-          <span className="font-[var(--font-mono)] text-[10px]" style={{ color: 'var(--color-border)' }}>→</span>
-          <span className="font-[var(--font-mono)] text-[10px] font-semibold" style={{ color }}>
-            {targetStr}
-          </span>
-        </div>
-      )}
-
-      {/* Regel 3: oefening-chips bij grouped rows */}
-      {isGrouped && (
-        <p className="font-[var(--font-mono)] text-[9px] text-[var(--color-text-secondary)] mb-0.5">
-          {exercises.slice(0, 3).join(' · ')}{exercises.length > 3 ? ` +${exercises.length - 3} meer` : ''}
-        </p>
-      )}
-
-      {/* Regel 4: uitlegzin */}
-      <p className="font-[var(--font-mono)] text-[9px]" style={{ color: `${color}99` }}>
-        {advice.advice}
-      </p>
     </div>
   )
 }

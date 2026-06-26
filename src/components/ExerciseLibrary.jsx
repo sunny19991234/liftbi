@@ -7,6 +7,106 @@ import { calculatePRsForExercise } from '../lib/prData'
 
 const MUSCLE_GROUPS = ['Borst', 'Rug', 'Schouders', 'Biceps', 'Triceps', 'Benen', 'Forearms', 'Cardio', 'Overig']
 
+function BodyIcon({ muscle, color, size = 28 }) {
+  const BASE   = '#3A3D45'
+  const STROKE = '#505560'
+  const DIM    = '#252830'
+
+  const b = { fill: BASE,  stroke: STROKE, strokeWidth: 0.8 }
+  const h = { fill: color, stroke: color,  strokeWidth: 0.5, opacity: 0.95 }
+  const d = { fill: DIM,   stroke: '#3A3D45', strokeWidth: 0.6 }
+
+  const is = (g) => muscle === g
+
+  return (
+    <svg
+      viewBox="0 0 40 60"
+      width={size}
+      height={size}
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'block' }}
+      aria-label={muscle}
+    >
+      {/* Hoofd */}
+      <ellipse cx="20" cy="5.5" rx="4.2" ry="4.5" {...b} />
+      {/* Nek */}
+      <rect x="17.5" y="9.5" width="5" height="3" rx="1" {...b} />
+
+      {/* Schouders */}
+      <ellipse cx="9"  cy="14" rx="4.2" ry="3.2" {...(is('Schouders') ? h : b)} />
+      <ellipse cx="31" cy="14" rx="4.2" ry="3.2" {...(is('Schouders') ? h : b)} />
+
+      {/* Bovenarm links — biceps voorkant */}
+      <path d="M7 16 Q4.5 19 5 24 L8 24 Q8.5 19.5 10 17 Z"
+        {...(is('Biceps') ? h : is('Triceps') ? d : b)} />
+      {/* Bovenarm rechts */}
+      <path d="M33 16 Q35.5 19 35 24 L32 24 Q31.5 19.5 30 17 Z"
+        {...(is('Biceps') ? h : is('Triceps') ? d : b)} />
+
+      {/* Triceps overlay (achterkant bovenarm) */}
+      {is('Triceps') && (
+        <>
+          <path d="M7.5 16.5 Q5.5 20 6 24 L8 24 Q8 20 10 17.5 Z"
+            fill={color} stroke={color} strokeWidth={0.4} opacity={0.9} />
+          <path d="M32.5 16.5 Q34.5 20 34 24 L32 24 Q32 20 30 17.5 Z"
+            fill={color} stroke={color} strokeWidth={0.4} opacity={0.9} />
+        </>
+      )}
+
+      {/* Onderarm links — Forearms */}
+      <path d="M5 24 Q3.5 29 4.5 33 L7.5 33 Q7.5 29 8 24 Z"
+        {...(is('Forearms') ? h : b)} />
+      {/* Onderarm rechts */}
+      <path d="M35 24 Q36.5 29 35.5 33 L32.5 33 Q32.5 29 32 24 Z"
+        {...(is('Forearms') ? h : b)} />
+
+      {/* Borst */}
+      <path d="M12 13 Q12 21 16 22.5 L20 23 L24 22.5 Q28 21 28 13 Q24 11.5 20 11.5 Q16 11.5 12 13 Z"
+        {...(is('Borst') ? h : b)} />
+
+      {/* Rug / Lat overlay */}
+      {is('Rug') && (
+        <path d="M11.5 13 Q11 21 13.5 24 L20 25 L26.5 24 Q29 21 28.5 13 Q24 11 20 11 Q16 11 11.5 13 Z"
+          fill={color} stroke={color} strokeWidth={0.5} opacity={0.85} />
+      )}
+
+      {/* Buik / core */}
+      <path d="M15 23 L14 36 L20 37 L26 36 L25 23 L20 24 Z"
+        {...(is('Cardio') ? { fill: '#4AE86B22', stroke: STROKE, strokeWidth: 0.8 } : b)} />
+
+      {/* Cardio hartslag-lijn overlay */}
+      {is('Cardio') && (
+        <polyline
+          points="12,29 15,29 17,25 19,34 21,27 23,29 28,29"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.95}
+        />
+      )}
+
+      {/* Heup */}
+      <path d="M14 36 L13 40 L27 40 L26 36 Z" {...b} />
+
+      {/* Bovenbeen links */}
+      <path d="M13 40 Q11 46 12 52 L17 52 Q17 46 16 40 Z"
+        {...(is('Benen') ? h : b)} />
+      {/* Bovenbeen rechts */}
+      <path d="M27 40 Q29 46 28 52 L23 52 Q23 46 24 40 Z"
+        {...(is('Benen') ? h : b)} />
+
+      {/* Onderbeen links */}
+      <path d="M12 52 Q11.5 56 12.5 59 L16.5 59 Q17 56 17 52 Z"
+        {...(is('Benen') ? { ...h, opacity: 0.6 } : b)} />
+      {/* Onderbeen rechts */}
+      <path d="M28 52 Q28.5 56 27.5 59 L23.5 59 Q23 56 23 52 Z"
+        {...(is('Benen') ? { ...h, opacity: 0.6 } : b)} />
+    </svg>
+  )
+}
+
 const MG_COLORS = {
   Borst: '#3E7CB1', Rug: '#22C55E', Schouders: '#D9A441', Biceps: '#FF4B3E',
   Triceps: '#8B5CF6', Benen: '#EC4899', Forearms: '#F97316', Cardio: '#14B8A6',
@@ -794,13 +894,17 @@ export default function ExerciseLibrary({ initialExercise, onResetInitialExercis
                       }}
                     >
                       <div
-                        className="w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[10px] font-[var(--font-mono)] font-bold"
+                        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center overflow-hidden"
                         style={{
-                          background: primaryColor ? `${primaryColor}20` : '#2A2D31',
-                          color: primaryColor ?? '#9499A1',
+                          background: primaryColor ? `${primaryColor}18` : '#2A2D31',
+                          border: primaryColor ? `1px solid ${primaryColor}30` : '1px solid #2A2D31',
                         }}
                       >
-                        {title.slice(0, 1).toUpperCase()}
+                        <BodyIcon
+                          muscle={primary?.muscle_group ?? 'Ongecategoriseerd'}
+                          color={primaryColor ?? '#9499A1'}
+                          size={26}
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-xs font-[var(--font-body)] truncate leading-tight ${
