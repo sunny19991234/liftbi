@@ -61,7 +61,7 @@ function App() {
       </header>
 
       {/* Pagina-inhoud — extra ondermarge op mobiel voor de bottom nav */}
-      <div className="pb-20 sm:pb-0">
+      <div className="pb-[88px] sm:pb-0">
         {tab === 'home'       && <Home onNavigate={onNavigate} onTokenExpired={() => setLoggedIn(false)} />}
         {tab === 'volume'     && <VolumeDashboard />}
         {tab === 'oefeningen' && (
@@ -75,23 +75,60 @@ function App() {
         {tab === 'workouts'   && <Workouts />}
       </div>
 
-      {/* Mobiele bottom nav — alleen zichtbaar op mobiel */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-bg)]/95 backdrop-blur-sm border-t border-[var(--color-border-subtle)]">
-        <div className="flex items-stretch">
-          {visibleTabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onNavigate(t.id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
-                tab === t.id
-                  ? 'text-[var(--color-accent)]'
-                  : 'text-[var(--color-text-tertiary)]'
-              }`}
-            >
-              <i className={`ti ti-${t.icon}`} style={{ fontSize: 20 }} aria-hidden="true" />
-              <span className="font-[var(--font-body)] text-[10px] leading-none">{t.label}</span>
-            </button>
-          ))}
+      {/* Mobiele bottom nav — floating pill, alleen zichtbaar op mobiel */}
+      <nav
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-center"
+        style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+      >
+        <div
+          className="flex items-center w-[calc(100%-32px)] max-w-sm"
+          style={{
+            height: 62,
+            background: 'var(--color-card-raised)',
+            border: '1px solid var(--color-border-subtle)',
+            borderRadius: 22,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.04)',
+          }}
+        >
+          {visibleTabs.map((t) => {
+            const isActive = tab === t.id
+            return (
+              <button
+                key={t.id}
+                onClick={() => onNavigate(t.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className="flex-1 flex flex-col items-center justify-center gap-[3px] relative py-2 transition-colors"
+              >
+                <i
+                  className={`ti ti-${t.icon} transition-colors`}
+                  style={{
+                    fontSize: 22,
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                  }}
+                  aria-hidden="true"
+                />
+                <span
+                  className="font-[var(--font-body)] text-[9px] leading-none tracking-[0.04em] transition-colors"
+                  style={{
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    fontWeight: isActive ? 700 : 500,
+                  }}
+                >
+                  {t.label}
+                </span>
+                {/* Actieve dot */}
+                <span
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-full transition-opacity"
+                  style={{
+                    width: 4,
+                    height: 4,
+                    background: 'var(--color-accent)',
+                    opacity: isActive ? 1 : 0,
+                  }}
+                />
+              </button>
+            )
+          })}
         </div>
       </nav>
     </div>
