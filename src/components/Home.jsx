@@ -17,7 +17,7 @@ import {
   fetchNextPlanned,
   fetchDayStrip,
   fetchWeekVolume,
-  fetchPreviousWeekVolume,
+  fetchPreviousWeekVolumeByCount,
   fetchRecentWorkouts,
   fetchUpcomingPlanned,
 } from '../lib/homeData'
@@ -89,11 +89,10 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setNextPlanned(next)
 
       // Daarna alles parallel, readiness nu met het juiste workout-type
-      const [strip, vol, prevVol, plateauList, allPRs, readinessData, streakData, recentWos, upcomingWos, dlWeeks] =
+      const [strip, vol, plateauList, allPRs, readinessData, streakData, recentWos, upcomingWos, dlWeeks] =
         await Promise.all([
           fetchDayStrip(),
           fetchWeekVolume(),
-          fetchPreviousWeekVolume(dayOfWeek),
           detectPlateaus(),
           calculateAllPRs(),
           calculateReadinessScore(next?.title),
@@ -103,7 +102,11 @@ export default function Home({ onNavigate, onTokenExpired }) {
           fetchDeloadWeeks(),
         ])
 
-      const imbalanceList = await detectImbalances(upcomingWos)
+      // prevVol en imbalances parallel in tweede batch (afhankelijk van vol en upcomingWos)
+      const [imbalanceList, prevVol] = await Promise.all([
+        detectImbalances(upcomingWos),
+        fetchPreviousWeekVolumeByCount(vol.workoutCount),
+      ])
 
       setDayStrip(strip)
       setWeekVolume(vol)
@@ -117,7 +120,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
       setUpcomingPlanned(upcomingWos)
       setDeloadWeeks(dlWeeks)
 
-      fetchBestWeekComparison(vol.volumeKg, dayOfWeek).then(setBestWeek).catch(() => {})
+      fetchBestWeekComparison(vol.volumeKg, dayOfWeek).then(setBestWeek).catch(() => {}) // dayOfWeek voor best-week bar
       loadCoachAdvice(next)
     }
     run().catch((err) => setError(err.message))
@@ -195,7 +198,7 @@ export default function Home({ onNavigate, onTokenExpired }) {
             onNavigate={onNavigate}
           />
           {coachAdvice && coachAdvice.advices.length > 0 && (
-            <CoachAdviceCard advice={coachAdvice} />
+            <CoachAdviceCard advice={coachAdvice} onNavigate={onNavigate} />
           )}
         </div>
 
@@ -214,11 +217,8 @@ export default function Home({ onNavigate, onTokenExpired }) {
             />
           </div>
           <ProactiveSignals
-            plateaus={plateaus}
             topPRs={topPRs}
             recentWorkouts={recentWorkouts}
-            imbalances={imbalances}
-            isDeload={isCurrentDeload}
             onNavigate={onNavigate}
           />
           <UploadCard onUploaded={loadAll} onTokenExpired={onTokenExpired} />
@@ -745,29 +745,21 @@ function DeltaPill({ pct }) {
 
 // ─── Proactieve signalen ──────────────────────────────────────────────────────
 
-function ProactiveSignals({ plateaus, topPRs, recentWorkouts, imbalances, isDeload, onNavigate }) {
-  const hasData = (plateaus || topPRs) !== null
-
+function ProactiveSignals({ topPRs, recentWorkouts, onNavigate }) {
   const last4Dates = new Set((recentWorkouts ?? []).slice(0, 4).map((w) => w.start_date))
   const recentPRs = topPRs
     ? topPRs.filter((pr) => pr.oneRepMax?.date && last4Dates.has(pr.oneRepMax.date))
     : []
 
-  const visiblePlateaus = isDeload ? [] : (plateaus ?? [])
-  const visibleImbalances = isDeload ? [] : (imbalances ?? []).slice(0, 2)
-  const signalCount = recentPRs.length + visiblePlateaus.length + visibleImbalances.length
-
-  if (!hasData || signalCount === 0) return null
+  if (!topPRs || recentPRs.length === 0) return null
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Sectie-label */}
       <p className="font-[var(--font-mono)] text-[9px] uppercase tracking-widest px-0.5"
         style={{ color: 'var(--color-text-secondary)' }}>
-        Signalen · {signalCount}
+        PR's · {recentPRs.length}
       </p>
 
-      {/* PRs — altijd bovenaan, meest feestelijk */}
       {recentPRs.slice(0, 3).map((pr) => (
         <SignalCard
           key={pr.exercise_title}
@@ -785,40 +777,6 @@ function ProactiveSignals({ plateaus, topPRs, recentWorkouts, imbalances, isDelo
           onClick={() => onNavigate('oefeningen', { exercise: pr.exercise_title })}
         />
       ))}
-
-      {/* Plateaus */}
-      {visiblePlateaus.slice(0, 2).map((p) => (
-        <SignalCard
-          key={p.exercise_title}
-          icon="chart-line"
-          iconStyle={{ background: 'rgba(217,164,65,0.12)', border: '1px solid rgba(217,164,65,0.25)', color: '#D9A441' }}
-          category="Plateau"
-          categoryColor="#D9A441"
-          title={p.exercise_title}
-          sub={`${p.sessions.length}× geen progressie · e1RM ${p.sessions[p.sessions.length - 1]?.e1rm} kg`}
-          cardStyle={{ background: 'rgba(217,164,65,0.03)', border: '1px solid rgba(217,164,65,0.12)' }}
-          onClick={() => onNavigate('oefeningen', { exercise: p.exercise_title })}
-        />
-      ))}
-
-      {/* Disbalans */}
-      {visibleImbalances.map((imb) => {
-        const isHigh = imb.status === 'high'
-        const rgb = isHigh ? '255,75,62' : '217,164,65'
-        const color = isHigh ? 'var(--color-status-high)' : 'var(--color-status-low)'
-        return (
-          <SignalCard
-            key={imb.muscle_group}
-            icon={isHigh ? 'trending-up' : 'trending-down'}
-            iconStyle={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.25)`, color }}
-            category={isHigh ? 'Te veel volume' : 'Te weinig volume'}
-            categoryColor={color}
-            title={imb.muscle_group}
-            sub={`${imb.setCount} sets (min ${imb.min})`}
-            cardStyle={{ background: `rgba(${rgb},0.03)`, border: `1px solid rgba(${rgb},0.12)` }}
-          />
-        )
-      })}
     </div>
   )
 }

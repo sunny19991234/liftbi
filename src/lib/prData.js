@@ -67,7 +67,7 @@ export async function calculatePRsForExercise(exerciseTitle) {
     return { exercise_title: exerciseTitle, oneRepMax: null, repPr: null, volumePr: null }
   }
 
-  const mostRecentDate = sets[sets.length - 1].start_date
+  const cutoff14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   // --- Estimated 1RM ---
   let best1RM = null
@@ -112,9 +112,9 @@ export async function calculatePRsForExercise(exerciseTitle) {
 
   return {
     exercise_title: exerciseTitle,
-    oneRepMax: best1RM ? { ...best1RM, isRecent: best1RM.date === mostRecentDate } : null,
-    repPr: repPr ? { ...repPr, isRecent: repPr.date === mostRecentDate } : null,
-    volumePr: bestVolume ? { ...bestVolume, isRecent: bestVolume.date === mostRecentDate } : null,
+    oneRepMax: best1RM ? { ...best1RM, isRecent: best1RM.date >= cutoff14 } : null,
+    repPr: repPr ? { ...repPr, isRecent: repPr.date >= cutoff14 } : null,
+    volumePr: bestVolume ? { ...bestVolume, isRecent: bestVolume.date >= cutoff14 } : null,
   }
 }
 

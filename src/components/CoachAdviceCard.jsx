@@ -151,9 +151,28 @@ function SummaryBar({ items }) {
 
 // ─── AdviceRow ────────────────────────────────────────────────────────────────
 
-function AdviceRow({ item }) {
+function AdviceRow({ item, onNavigate }) {
   const tok = T[item.type]
   const icon = TYPE_ICON[item.type]
+
+  function ExerciseLabel({ name }) {
+    if (!onNavigate) {
+      return <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{name}</span>
+    }
+    return (
+      <button
+        onClick={() => onNavigate('oefeningen', { exercise: name })}
+        style={{
+          fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500,
+          color: tok.color, background: 'none', border: 'none', cursor: 'pointer',
+          padding: 0, textDecoration: 'underline', textDecorationColor: `${tok.color}50`,
+          textUnderlineOffset: 2,
+        }}
+      >
+        {name}
+      </button>
+    )
+  }
 
   return (
     <div
@@ -187,15 +206,14 @@ function AdviceRow({ item }) {
             {item.grouped ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 8, rowGap: 1 }}>
                 {item.exercises.map((ex, i) => (
-                  <span key={ex} style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                    {ex}{i < item.exercises.length - 1 ? ' ·' : ''}
+                  <span key={ex} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <ExerciseLabel name={ex} />
+                    {i < item.exercises.length - 1 && <span style={{ color: 'var(--color-text-secondary)', marginLeft: 2 }}> ·</span>}
                   </span>
                 ))}
               </div>
             ) : (
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                {item.exercises[0]}
-              </span>
+              <ExerciseLabel name={item.exercises[0]} />
             )}
           </div>
           <span style={{
@@ -278,7 +296,7 @@ function AdviceRow({ item }) {
 
 // ─── CoachAdviceCard ──────────────────────────────────────────────────────────
 
-export default function CoachAdviceCard({ advice }) {
+export default function CoachAdviceCard({ advice, onNavigate }) {
   const [holdExpanded, setHoldExpanded] = useState(false)
   const { workoutTitle, date, advices: rawAdvices } = advice
 
@@ -324,7 +342,7 @@ export default function CoachAdviceCard({ advice }) {
         <SummaryBar items={items} />
 
         {visible.map((item) => (
-          <AdviceRow key={item.id} item={item} />
+          <AdviceRow key={item.id} item={item} onNavigate={onNavigate} />
         ))}
 
         {hold.length > 0 && (

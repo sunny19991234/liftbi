@@ -179,6 +179,16 @@ export default function Workouts() {
     load()
   }
 
+  async function handleDeletePlanned(plannedId) {
+    if (!plannedId) return
+    const { error: deleteError } = await supabase
+      .from('planned_workouts')
+      .delete()
+      .eq('id', plannedId)
+    if (deleteError) { setError(deleteError.message); return }
+    load()
+  }
+
   useEffect(() => { load() }, [year, month]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function goToPrev() {
@@ -273,7 +283,7 @@ export default function Workouts() {
                 const weekStart = getWeekStartForRow(week)
                 const isDeload  = weekStart ? deloadSet.has(weekStart) : false
                 return (
-                  <div key={wi} className="grid gap-0.5" style={{ gridTemplateColumns: '22px repeat(7, 1fr)' }}>
+                  <div key={wi} className="grid gap-0.5 items-start" style={{ gridTemplateColumns: '22px repeat(7, 1fr)' }}>
                     <WeekToggleBtn
                       weekStart={weekStart}
                       isDeload={isDeload}
@@ -291,6 +301,7 @@ export default function Workouts() {
                         onPlanClick={() => setPlanDialogDate(dateStr)}
                         onDoneClick={handleCalendarDoneClick}
                         onSkip={handleSkip}
+                        onDelete={handleDeletePlanned}
                       />
                     ))}
                   </div>
@@ -406,8 +417,9 @@ function WeekToggleBtn({ weekStart, isDeload, toggling, onToggle }) {
 
 // ─── CompactDayCell ───────────────────────────────────────────────────────────
 
-function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick, onSkip }) {
+function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick, onSkip, onDelete }) {
   const [showSkipMenu, setShowSkipMenu] = useState(false)
+  const [showPlannedMenu, setShowPlannedMenu] = useState(false)
 
   if (!dateStr) return <div className="aspect-square" />
 
@@ -416,13 +428,14 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
   const isPlanned = info?.type === 'planned'
   const isMissed = isPlanned && info.status === 'missed'
   const isSkipped = isPlanned && info.status === 'skipped'
-  const isClickable = !info || isDone || (isPlanned && info.status === 'planned') || isMissed
+  const isActivePlanned = isPlanned && info.status === 'planned'
+  const isClickable = !info || isDone || isActivePlanned || isMissed
 
   let bgClass = isDeload ? 'bg-[rgba(217,164,65,0.08)]' : 'bg-[var(--color-card)]'
-  if (isDone)                                bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
-  else if (isPlanned && info.status === 'planned') bgClass = 'bg-[var(--color-data)]/[0.08]'
-  else if (isMissed)                         bgClass = 'bg-[var(--color-status-high)]/[0.08]'
-  else if (isSkipped)                        bgClass = 'bg-[var(--color-text-secondary)]/[0.08] opacity-50'
+  if (isDone)             bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
+  else if (isActivePlanned) bgClass = 'bg-[var(--color-data)]/[0.08]'
+  else if (isMissed)      bgClass = 'bg-[var(--color-status-high)]/[0.08]'
+  else if (isSkipped)     bgClass = 'bg-[var(--color-text-secondary)]/[0.08] opacity-50'
 
   const splitStyle = isDone ? getSplitStyle(info.title) : null
   const splitLabel = isDone ? getSplitLabel(info.title) : null
@@ -433,6 +446,7 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
   function handleClick() {
     if (isDone) { onDoneClick(info.workoutId); return }
     if (isMissed) { setShowSkipMenu((v) => !v); return }
+    if (isActivePlanned) { setShowPlannedMenu((v) => !v); return }
     if (isClickable) onPlanClick()
   }
 
@@ -507,6 +521,29 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
             onClick={(e) => { e.stopPropagation(); onSkip(info.plannedId); setShowSkipMenu(false) }}
           >
             Overgeslagen
+          </button>
+        </div>
+      )}
+
+      {/* Menu overlay voor geplande sessies */}
+      {showPlannedMenu && isActivePlanned && (
+        <div
+          className="absolute inset-0 flex items-center justify-center gap-1 bg-black/60 rounded-md"
+          onClick={(e) => { e.stopPropagation(); setShowPlannedMenu(false) }}
+        >
+          <button
+            type="button"
+            className="text-[7px] font-[var(--font-body)] text-[var(--color-data)] bg-[var(--color-card)] rounded px-1 py-0.5 leading-tight hover:brightness-125 transition-all"
+            onClick={(e) => { e.stopPropagation(); setShowPlannedMenu(false); onPlanClick() }}
+          >
+            Bewerk
+          </button>
+          <button
+            type="button"
+            className="text-[7px] font-[var(--font-body)] text-[var(--color-status-high)] bg-[var(--color-card)] rounded px-1 py-0.5 leading-tight hover:brightness-125 transition-all"
+            onClick={(e) => { e.stopPropagation(); onDelete(info.plannedId); setShowPlannedMenu(false) }}
+          >
+            ✕
           </button>
         </div>
       )}
@@ -705,21 +742,10 @@ function ComparisonSection({ prevDate, comparison }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <p className="text-[10px] font-[var(--font-body)] uppercase tracking-wide text-[var(--color-text-secondary)]">
+    <div className="flex flex-col gap-0.5">
+      <p className="text-[10px] font-[var(--font-body)] uppercase tracking-wide text-[var(--color-text-secondary)] mb-1">
         vs {formatDate(prevDate)}
       </p>
-
-      <div
-        className="grid gap-x-2 border-b border-[var(--color-border-subtle)] pb-1 mb-0.5"
-        style={{ gridTemplateColumns: '1fr 56px 72px 80px' }}
-      >
-        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">Oefening</span>
-        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">Δ kg</span>
-        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">Vol.</span>
-        <span className="text-[9px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)] text-right">e1RM</span>
-      </div>
-
       {Array.from(comparison.entries()).map(([name, delta]) => (
         <ExerciseComparisonRow key={name} name={name} delta={delta} />
       ))}
@@ -736,49 +762,47 @@ function ExerciseComparisonRow({ name, delta }) {
     ? Math.round((delta.currE1rm - delta.prevE1rm) * 10) / 10
     : null
 
+  const weightLabel = delta.deltaWeight == null
+    ? null
+    : wPos ? `Δ+${delta.deltaWeight.toFixed(1).replace('.', ',')} kg ↑`
+    : wNeg ? `Δ${delta.deltaWeight.toFixed(1).replace('.', ',')} kg ↓`
+    : `Δ= ${delta.deltaWeight.toFixed(1).replace('.', ',')} kg`
+
+  const volLabel = vPos ? `vol ↑${delta.deltaVolume}` : vNeg ? `vol ↓${Math.abs(delta.deltaVolume)}` : `vol =0`
+  const e1rmLabel = delta.currE1rm != null
+    ? `e1RM ${delta.currE1rm}${e1rmDelta && e1rmDelta !== 0 ? ` (${e1rmDelta > 0 ? '+' : ''}${e1rmDelta})` : ''}`
+    : null
+
+  const weightColor = delta.deltaWeight == null
+    ? 'var(--color-text-tertiary)'
+    : wPos ? 'var(--color-status-ok)' : wNeg ? 'var(--color-status-high)' : 'var(--color-text-secondary)'
+  const volColor = vPos ? 'var(--color-status-ok)' : vNeg ? 'var(--color-status-high)' : 'var(--color-text-secondary)'
+  const e1rmColor = e1rmDelta && e1rmDelta !== 0
+    ? (e1rmDelta > 0 ? 'var(--color-status-ok)' : 'var(--color-status-high)')
+    : 'var(--color-text-secondary)'
+
   return (
-    <div
-      className="grid gap-x-2 py-1.5 border-b border-[var(--color-bg)] last:border-0 items-center"
-      style={{ gridTemplateColumns: '1fr 56px 72px 80px' }}
-    >
-      <span className="text-xs font-[var(--font-body)] text-[var(--color-text-primary)] truncate min-w-0">
+    <div className="py-1.5 border-b border-[var(--color-bg)] last:border-0">
+      {/* Regel 1: oefeningstitel — volledig leesbaar */}
+      <p className="text-xs font-[var(--font-body)] font-medium text-[var(--color-text-primary)] leading-tight mb-1">
         {name}
-      </span>
-
-      <span className={`text-xs font-[var(--font-mono)] tabular-data text-right ${
-        delta.deltaWeight == null ? 'text-[var(--color-text-tertiary)]'
-        : wPos ? 'text-[var(--color-status-ok)]'
-        : wNeg ? 'text-[var(--color-status-high)]'
-        : 'text-[var(--color-text-secondary)]'
-      }`}>
-        {delta.deltaWeight == null
-          ? '—'
-          : wPos ? `+${delta.deltaWeight.toFixed(1).replace('.', ',')} ↑`
-          : wNeg ? `${delta.deltaWeight.toFixed(1).replace('.', ',')} ↓`
-          : `= ${delta.deltaWeight.toFixed(1).replace('.', ',')}`}
-      </span>
-
-      <span className={`text-xs font-[var(--font-mono)] tabular-data text-right ${
-        vPos ? 'text-[var(--color-status-ok)]'
-        : vNeg ? 'text-[var(--color-status-high)]'
-        : 'text-[var(--color-text-secondary)]'
-      }`}>
-        {vPos ? `↑ ${delta.deltaVolume}` : vNeg ? `↓ ${Math.abs(delta.deltaVolume)}` : `= 0`} kg
-      </span>
-
-      <span className="text-xs font-[var(--font-mono)] tabular-data text-right">
-        {delta.currE1rm == null
-          ? <span className="text-[var(--color-text-tertiary)]">—</span>
-          : <>
-              <span className="text-[var(--color-text-secondary)]">{delta.currE1rm}</span>
-              {e1rmDelta != null && e1rmDelta !== 0 && (
-                <span className={`text-[10px] ${e1rmDelta > 0 ? 'text-[var(--color-status-ok)]' : 'text-[var(--color-status-high)]'}`}>
-                  {' '}{e1rmDelta > 0 ? '+' : ''}{e1rmDelta}
-                </span>
-              )}
-            </>
-        }
-      </span>
+      </p>
+      {/* Regel 2: delta's */}
+      <div className="flex gap-2.5 flex-wrap">
+        {weightLabel && (
+          <span className="text-[10px] font-[var(--font-mono)] tabular-data" style={{ color: weightColor }}>
+            {weightLabel}
+          </span>
+        )}
+        <span className="text-[10px] font-[var(--font-mono)] tabular-data" style={{ color: volColor }}>
+          {volLabel} kg
+        </span>
+        {e1rmLabel && (
+          <span className="text-[10px] font-[var(--font-mono)] tabular-data" style={{ color: e1rmColor }}>
+            {e1rmLabel}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

@@ -208,11 +208,11 @@ function PrTrophyShelf({ prs, accentColor }) {
         accentColor={accentColor}
       />
       <PrCard
-        label="Rep-PR"
-        value={repPr ? `${repPr.reps} reps` : '—'}
-        sub={repPr ? `@ ${repPr.weight_kg} kg · ${fmtShort(repPr.date)}` : null}
+        label="Zwaarste set"
+        value={repPr ? `${repPr.weight_kg} kg` : '—'}
+        sub={repPr ? `${repPr.reps} reps · ${fmtShort(repPr.date)}` : null}
         isRecent={repPr?.isRecent ?? false}
-        icon="repeat"
+        icon="barbell"
         accentColor={accentColor}
       />
       <PrCard
@@ -241,6 +241,10 @@ function ChartTooltip({ active, payload, suffix }) {
 }
 
 function ExerciseChart({ title, data, dataKey, suffix, color }) {
+  const maxVal = data.length ? Math.max(...data.map(d => d[dataKey] ?? 0)) : 0
+  const yAxisWidth = maxVal >= 10000 ? 54 : maxVal >= 1000 ? 46 : 38
+  const leftMargin = -(38 - yAxisWidth + 16)
+
   return (
     <div className="surface rounded-xl p-4">
       <p className="text-xs text-[var(--color-text-secondary)] font-[var(--font-body)] mb-3">{title}</p>
@@ -248,11 +252,11 @@ function ExerciseChart({ title, data, dataKey, suffix, color }) {
         <p className="text-sm text-[var(--color-text-secondary)] font-[var(--font-body)]">Geen data voor deze periode.</p>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+          <LineChart data={data} margin={{ top: 4, right: 8, left: leftMargin, bottom: 0 }}>
             <CartesianGrid strokeDasharray="2 4" stroke={GRID_COLOR} vertical={false} />
             <XAxis dataKey="label" tick={AXIS_STYLE} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
             <YAxis
-              tick={AXIS_STYLE} axisLine={false} tickLine={false} width={36}
+              tick={AXIS_STYLE} axisLine={false} tickLine={false} width={yAxisWidth}
               domain={[dataMin => Math.max(0, dataMin - Math.ceil(dataMin * 0.05)), dataMax => dataMax + Math.ceil(dataMax * 0.03)]}
               tickFormatter={(v) => Math.round(v)}
             />
@@ -546,19 +550,6 @@ function ExerciseDetailPanel({ exercise, mappings, exerciseSets, prs, onReload }
           )}
         </div>
 
-        {bestSet && (
-          <div className="flex items-center gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#D9A441">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
-              Zwaarst getild:{' '}
-              <span className="text-[var(--color-text-primary)]">{bestSet.weight_kg} kg × {bestSet.reps}</span>
-              <span className="mx-1.5 opacity-40">·</span>
-              {fmtDate(bestSet.start_date)}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* PR Trophy Shelf */}

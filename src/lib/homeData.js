@@ -186,3 +186,53 @@ export async function fetchPreviousWeekVolume(dayOfWeek = 6) {
   const previousWeekStart = addDays(currentWeekStart, -7)
   return fetchVolumeForWeek(previousWeekStart, dayOfWeek)
 }
+
+/**
+ * Vorige kalenderweek, maar alleen de eerste maxWorkouts workouts (op volgorde van datum).
+ * Gebruik dit voor een eerlijke vergelijking: als je deze week 2× getraind hebt,
+ * vergelijk je met de eerste 2 workouts van vorige week.
+ */
+export async function fetchPreviousWeekVolumeByCount(maxWorkouts) {
+  const currentWeekStart = getWeekStart(getTodayStr())
+  const previousWeekStart = addDays(currentWeekStart, -7)
+  const previousWeekEnd = addDays(previousWeekStart, 6)
+
+  // Als er deze week nog geen workouts zijn, toon de volledige vorige week als context
+  if (!maxWorkouts || maxWorkouts <= 0) {
+    return fetchVolumeForWeek(previousWeekStart, 6)
+  }
+
+  const { data: workouts, error: wErr } = await supabase
+    .from('workouts')
+    .select('id')
+    .gte('start_date', previousWeekStart)
+    .lte('start_date', previousWeekEnd)
+    .order('start_date', { ascending: true })
+    .limit(maxWorkouts)
+  if (wErr) throw wErr
+
+  if (workouts.length === 0) {
+    return { setCount: 0, volumeKg: 0, avgRpe: null, workoutCount: 0, weekStart: previousWeekStart }
+  }
+
+  const { data: sets, error: sErr } = await supabase
+    .from('sets')
+    .select('weight_kg, reps, rpe')
+    .in('workout_id', workouts.map((w) => w.id))
+  if (sErr) throw sErr
+
+  let setCount = 0, volumeKg = 0, rpeSum = 0, rpeCount = 0
+  for (const s of sets) {
+    setCount++
+    if (s.weight_kg != null && s.reps != null) volumeKg += s.weight_kg * s.reps
+    if (s.rpe != null) { rpeSum += s.rpe; rpeCount++ }
+  }
+
+  return {
+    setCount,
+    volumeKg: Math.round(volumeKg),
+    avgRpe: rpeCount > 0 ? Math.round((rpeSum / rpeCount) * 10) / 10 : null,
+    workoutCount: workouts.length,
+    weekStart: previousWeekStart,
+  }
+}

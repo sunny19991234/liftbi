@@ -188,10 +188,12 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
           const isLast   = i === lastIdx
           const isDeload = deloadWeekSet?.has(w.weekStart)
 
-          const baseColor = isDeload
+          const barColor = isDeload
             ? '#D9A441'
-            : WEEK_COLOR_PALETTE[i % WEEK_COLOR_PALETTE.length]
-          const barColor = isLast ? baseColor : `${baseColor}AA`
+            : isLast
+              ? '#3E7CB1'
+              : '#3E7CB155'
+          const labelColor = isDeload ? '#D9A441' : isLast ? '#3E7CB1' : '#3E7CB180'
 
           return (
             <div
@@ -204,15 +206,7 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
                 gap: 4, height: '100%',
               }}
             >
-              {!manyWeeks && v > 0 && (
-                <span
-                  className="font-[var(--font-mono)] text-[7px] leading-none whitespace-nowrap"
-                  style={{ color: barColor }}
-                >
-                  {metaDef?.fmt(v)}
-                </span>
-              )}
-              {manyWeeks && isLast && v > 0 && (
+              {(!manyWeeks || isLast) && v > 0 && (
                 <span
                   className="font-[var(--font-mono)] text-[7px] leading-none whitespace-nowrap"
                   style={{ color: barColor }}
@@ -225,14 +219,19 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
                   width: '100%', height: barH, minHeight: v > 0 ? 4 : 0,
                   background: barColor,
                   borderRadius: '3px 3px 0 0',
+                  boxShadow: isLast && !isDeload ? '0 0 8px -2px rgba(62,124,177,0.5)' : 'none',
                 }}
               />
               {(!manyWeeks || isLast) && (
                 <span
-                  className="font-[var(--font-mono)] text-[8px] font-medium"
-                  style={{ color: barColor, opacity: isLast ? 1 : 0.7, whiteSpace: 'nowrap' }}
+                  className="font-[var(--font-mono)] text-[8px]"
+                  style={{
+                    color: labelColor,
+                    fontWeight: isLast ? 700 : 400,
+                    whiteSpace: 'nowrap',
+                  }}
                 >
-                  {isDeload && !manyWeeks ? '🌙' : `W${w.weekNum}`}
+                  {isDeload && !manyWeeks ? '🌙' : isLast ? `W${w.weekNum} ◀` : `W${w.weekNum}`}
                 </span>
               )}
             </div>
@@ -368,20 +367,24 @@ function WeeklyBars({ weeklyData, metric, color, deloadWeekSet, targetMin, targe
             left: 0,
             right: 0,
             height: `${Math.max(1, bandHeightPx)}px`,
-            background: '#9499A10A',
-            borderTop: '1px dashed #9499A130',
-            borderBottom: '1px dashed #9499A130',
+            background: '#9499A112',
+            borderTop: '1px dashed #9499A160',
+            borderBottom: '1px dashed #9499A160',
             pointerEvents: 'none',
             zIndex: 1,
           }}>
             <span style={{
-              position: 'absolute', top: -9, right: 2,
-              fontFamily: 'JetBrains Mono', fontSize: 7, color: '#9499A180',
-            }}>{targetMax}</span>
+              position: 'absolute', top: -11, right: 0,
+              fontFamily: 'JetBrains Mono', fontSize: 9, color: '#9499A1CC',
+              background: 'var(--color-bg)', padding: '0 2px',
+              lineHeight: 1,
+            }}>max {targetMax}</span>
             <span style={{
-              position: 'absolute', bottom: -9, right: 2,
-              fontFamily: 'JetBrains Mono', fontSize: 7, color: '#9499A180',
-            }}>{targetMin}</span>
+              position: 'absolute', bottom: -11, right: 0,
+              fontFamily: 'JetBrains Mono', fontSize: 9, color: '#9499A1CC',
+              background: 'var(--color-bg)', padding: '0 2px',
+              lineHeight: 1,
+            }}>min {targetMin}</span>
           </div>
         )}
         <div className="flex items-end gap-1.5" style={{ position: 'relative', zIndex: 2 }}>
@@ -488,6 +491,14 @@ function MuscleGroupRow({ data, isSelected, onSelect, deloadWeekSet, weeksBack, 
                     background: setCount < target.min ? '#D9A441' : setCount > target.max ? '#FF4B3E' : color,
                     transition: 'width 0.4s ease-out',
                   }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: setCount < target.min ? '#D9A441' : setCount > target.max ? '#FF4B3E' : color }}>
+                    {Math.round(setCount)} / {target.min}–{target.max} sets
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-text-secondary)', opacity: 0.6 }}>
+                    {setCount < target.min ? 'te weinig' : setCount > target.max ? 'te veel' : 'goed'}
+                  </span>
                 </div>
               </div>
             )}
@@ -748,9 +759,7 @@ export default function VolumeDashboard() {
         deloadWeekSet={deloadWeekSet}
       />
 
-      {!loading && weeksBack === 1 && (
-        <ImbalanceBar imbalances={imbalances} />
-      )}
+      {/* ImbalanceBar verwijderd — volume target hero niet meer getoond */}
 
       {!loading && weeksBack !== 1 && hitRateData.length > 0 && (
         <HitRateStrip
