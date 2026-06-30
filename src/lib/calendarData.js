@@ -94,6 +94,7 @@ export async function fetchMonthData(year, month) {
     const isPastAndStillPlanned = p.status === 'planned' && p.planned_date < todayStr
     dayMap.set(p.planned_date, {
       type: 'planned',
+      id: p.id,
       title: p.title,
       status: isPastAndStillPlanned ? 'missed' : p.status,
       notes: p.notes,

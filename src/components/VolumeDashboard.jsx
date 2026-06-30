@@ -191,9 +191,9 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
           const barColor = isDeload
             ? '#D9A441'
             : isLast
-              ? '#3E7CB1'
-              : '#3E7CB155'
-          const labelColor = isDeload ? '#D9A441' : isLast ? '#3E7CB1' : '#3E7CB180'
+              ? '#60A5FA'
+              : '#60A5FA66'
+          const labelColor = isDeload ? '#D9A441' : isLast ? '#60A5FA' : '#60A5FA99'
 
           return (
             <div
@@ -219,7 +219,7 @@ function HeroWeeklyBars({ weeklyData, metric = 'volumeKg', deloadWeekSet }) {
                   width: '100%', height: barH, minHeight: v > 0 ? 4 : 0,
                   background: barColor,
                   borderRadius: '3px 3px 0 0',
-                  boxShadow: isLast && !isDeload ? '0 0 8px -2px rgba(62,124,177,0.5)' : 'none',
+                  boxShadow: isLast && !isDeload ? '0 0 8px -2px rgba(96,165,250,0.5)' : 'none',
                 }}
               />
               {(!manyWeeks || isLast) && (
@@ -354,11 +354,20 @@ function WeeklyBars({ weeklyData, metric, color, deloadWeekSet, targetMin, targe
   const bandTopPx    = showBand ? (targetMax / chartMax) * BAR_MAX : 0
   const bandHeightPx = bandTopPx - bandBottomPx
 
+  const TARGET_COLOR = '#F59E0B'
+
   return (
     <div>
-      <p className="font-[var(--font-mono)] text-[8px] uppercase tracking-widest text-[var(--color-text-secondary)] mb-plate-2">
-        {metaDef?.label} per week
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <p className="font-[var(--font-mono)] text-[8px] uppercase tracking-widest text-[var(--color-text-secondary)]">
+          {metaDef?.label} per week
+        </p>
+        {showBand && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: TARGET_COLOR, opacity: 0.9 }}>
+            target {targetMin}–{targetMax}
+          </span>
+        )}
+      </div>
       <div style={{ position: 'relative' }}>
         {showBand && (
           <div style={{
@@ -367,25 +376,12 @@ function WeeklyBars({ weeklyData, metric, color, deloadWeekSet, targetMin, targe
             left: 0,
             right: 0,
             height: `${Math.max(1, bandHeightPx)}px`,
-            background: '#9499A112',
-            borderTop: '1px dashed #9499A160',
-            borderBottom: '1px dashed #9499A160',
+            background: `${TARGET_COLOR}18`,
+            borderTop: `1.5px dashed ${TARGET_COLOR}BB`,
+            borderBottom: `1.5px dashed ${TARGET_COLOR}BB`,
             pointerEvents: 'none',
             zIndex: 1,
-          }}>
-            <span style={{
-              position: 'absolute', top: -11, right: 0,
-              fontFamily: 'JetBrains Mono', fontSize: 9, color: '#9499A1CC',
-              background: 'var(--color-bg)', padding: '0 2px',
-              lineHeight: 1,
-            }}>max {targetMax}</span>
-            <span style={{
-              position: 'absolute', bottom: -11, right: 0,
-              fontFamily: 'JetBrains Mono', fontSize: 9, color: '#9499A1CC',
-              background: 'var(--color-bg)', padding: '0 2px',
-              lineHeight: 1,
-            }}>min {targetMin}</span>
-          </div>
+          }} />
         )}
         <div className="flex items-end gap-1.5" style={{ position: 'relative', zIndex: 2 }}>
           {weeklyData.map((w, i) => {
@@ -481,7 +477,7 @@ function MuscleGroupRow({ data, isSelected, onSelect, deloadWeekSet, weeksBack, 
               {' · '}{repCount.toLocaleString('nl-NL')} reps
               {avgRpe != null ? ` · RPE ${avgRpe}` : ''}
             </p>
-            {weeksBack === 1 && target && (
+            {(weeksBack === 1 || weeksBack === -1) && target && (
               <div style={{ marginTop: 4, width: '100%' }}>
                 <div style={{ background: 'var(--color-border)', height: 3, borderRadius: 2, overflow: 'hidden' }}>
                   <div style={{
