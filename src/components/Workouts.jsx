@@ -103,6 +103,7 @@ export default function Workouts() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [planDialogDate, setPlanDialogDate] = useState(null)
+  const [plannedPopup, setPlannedPopup]     = useState(null)
   const [highlightedId, setHighlightedId]   = useState(null)
   const [deloadWeeks, setDeloadWeeks]       = useState([])
   const [togglingWeek, setTogglingWeek]     = useState(null)
@@ -301,7 +302,7 @@ export default function Workouts() {
                         onPlanClick={() => setPlanDialogDate(dateStr)}
                         onDoneClick={handleCalendarDoneClick}
                         onSkip={handleSkip}
-                        onDelete={handleDeletePlanned}
+                        onPlannedClick={(info) => setPlannedPopup({ ...info, date: dateStr })}
                       />
                     ))}
                   </div>
@@ -322,12 +323,12 @@ export default function Workouts() {
           </div>
           <div className="flex flex-wrap gap-x-plate-3 gap-y-1">
             {[
-              { color: 'bg-[var(--color-data)]/30',                  label: 'Gepland'      },
-              { color: 'bg-[var(--color-status-high)]/30',            label: 'Gemist'       },
-              { color: 'bg-[var(--color-text-secondary)]/20',         label: 'Overgeslagen' },
+              { bg: 'rgba(6,182,212,0.25)',                           label: 'Gepland'      },
+              { bg: 'rgba(var(--color-status-high-rgb,255,75,62),0.3)',label: 'Gemist'       },
+              { bg: 'rgba(var(--color-text-secondary-rgb,148,153,161),0.2)', label: 'Overgeslagen' },
             ].map((it) => (
               <div key={it.label} className="flex items-center gap-1">
-                <span className={`w-2 h-2 rounded-sm ${it.color}`} />
+                <span className="w-2 h-2 rounded-sm bg-[var(--color-status-high)]/30" style={it.bg ? { background: it.bg } : {}} />
                 <span className="text-[10px] text-[var(--color-text-secondary)] font-[var(--font-body)]">{it.label}</span>
               </div>
             ))}
@@ -382,6 +383,15 @@ export default function Workouts() {
         )}
       </div>
 
+      {plannedPopup && (
+        <PlannedWorkoutPopup
+          info={plannedPopup}
+          onClose={() => setPlannedPopup(null)}
+          onDelete={async (id) => { await handleDeletePlanned(id); setPlannedPopup(null) }}
+          onEdit={(date) => { setPlannedPopup(null); setPlanDialogDate(date) }}
+        />
+      )}
+
       {planDialogDate && (
         <PlanDialog
           date={planDialogDate}
@@ -417,9 +427,8 @@ function WeekToggleBtn({ weekStart, isDeload, toggling, onToggle }) {
 
 // ─── CompactDayCell ───────────────────────────────────────────────────────────
 
-function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick, onSkip, onDelete }) {
+function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanClick, onDoneClick, onSkip, onPlannedClick }) {
   const [showSkipMenu, setShowSkipMenu] = useState(false)
-  const [showPlannedMenu, setShowPlannedMenu] = useState(false)
 
   if (!dateStr) return <div className="aspect-square" />
 
@@ -433,7 +442,7 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
 
   let bgClass = isDeload ? 'bg-[rgba(217,164,65,0.08)]' : 'bg-[var(--color-card)]'
   if (isDone)             bgClass = isDeload ? 'bg-[rgba(217,164,65,0.15)]' : 'bg-[var(--color-status-ok)]/[0.08]'
-  else if (isActivePlanned) bgClass = 'bg-[var(--color-data)]/[0.08]'
+  else if (isActivePlanned) bgClass = 'bg-[rgba(6,182,212,0.10)]'
   else if (isMissed)      bgClass = 'bg-[var(--color-status-high)]/[0.08]'
   else if (isSkipped)     bgClass = 'bg-[var(--color-text-secondary)]/[0.08] opacity-50'
 
@@ -446,7 +455,7 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
   function handleClick() {
     if (isDone) { onDoneClick(info.workoutId); return }
     if (isMissed) { setShowSkipMenu((v) => !v); return }
-    if (isActivePlanned) { setShowPlannedMenu((v) => !v); return }
+    if (isActivePlanned) { onPlannedClick(info); return }
     if (isClickable) onPlanClick()
   }
 
@@ -490,19 +499,19 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
                 {info.title?.slice(0, 5)}
               </span>
             )}
-            <span className="text-[7px] font-[var(--font-mono)] text-[var(--color-text-secondary)] tabular-data leading-tight">
-              {info.setCount}s
-            </span>
           </div>
         )}
 
         {isPlanned && (
           <div className="flex-1 flex items-end pb-0.5">
-            <span className={`text-[8px] font-[var(--font-body)] leading-tight ${
-              isMissed ? 'text-[var(--color-status-high)]'
-              : isSkipped ? 'text-[var(--color-text-secondary)]'
-              : 'text-[var(--color-data)]'
-            }`}>
+            <span
+              className="text-[8px] font-[var(--font-body)] leading-tight"
+              style={{
+                color: isMissed ? 'var(--color-status-high)'
+                  : isSkipped ? 'var(--color-text-secondary)'
+                  : '#06B6D4',
+              }}
+            >
               {getSplitLabel(info.title) ?? info.title?.slice(0, 4)}
             </span>
           </div>
@@ -525,28 +534,6 @@ function CompactDayCell({ dateStr, isToday, info, maxVolume, isDeload, onPlanCli
         </div>
       )}
 
-      {/* Menu overlay voor geplande sessies */}
-      {showPlannedMenu && isActivePlanned && (
-        <div
-          className="absolute inset-0 flex items-center justify-center gap-1 bg-black/60 rounded-md"
-          onClick={(e) => { e.stopPropagation(); setShowPlannedMenu(false) }}
-        >
-          <button
-            type="button"
-            className="text-[7px] font-[var(--font-body)] text-[var(--color-data)] bg-[var(--color-card)] rounded px-1 py-0.5 leading-tight hover:brightness-125 transition-all"
-            onClick={(e) => { e.stopPropagation(); setShowPlannedMenu(false); onPlanClick() }}
-          >
-            Bewerk
-          </button>
-          <button
-            type="button"
-            className="text-[7px] font-[var(--font-body)] text-[var(--color-status-high)] bg-[var(--color-card)] rounded px-1 py-0.5 leading-tight hover:brightness-125 transition-all"
-            onClick={(e) => { e.stopPropagation(); onDelete(info.plannedId); setShowPlannedMenu(false) }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </button>
   )
 }
@@ -969,6 +956,69 @@ function SectionLabel({ children }) {
     <p className="text-[10px] font-[var(--font-body)] uppercase tracking-wide text-[var(--color-text-secondary)] mb-plate-1">
       {children}
     </p>
+  )
+}
+
+// ─── PlannedWorkoutPopup ──────────────────────────────────────────────────────
+
+function PlannedWorkoutPopup({ info, onClose, onDelete, onEdit }) {
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    await onDelete(info.plannedId)
+    setDeleting(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="surface rounded-2xl p-plate-4 flex flex-col gap-plate-3 w-full max-w-sm"
+      >
+        <div style={{ borderLeft: '3px solid #06B6D4', paddingLeft: 10 }}>
+          <h3 className="font-[var(--font-display)] font-semibold text-lg text-[var(--color-text-primary)]">
+            {info.title}
+          </h3>
+          <p className="font-[var(--font-mono)] text-xs text-[var(--color-text-secondary)]">
+            {info.date} · gepland
+          </p>
+        </div>
+
+        {info.notes && (
+          <p className="font-[var(--font-body)] text-sm text-[var(--color-text-secondary)]">
+            {info.notes}
+          </p>
+        )}
+
+        <div className="flex gap-plate-2 justify-end pt-plate-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-plate-3 py-plate-2 rounded-lg text-sm text-[var(--color-text-secondary)] font-[var(--font-body)]"
+          >
+            Sluiten
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(info.date)}
+            className="px-plate-3 py-plate-2 rounded-lg text-sm font-[var(--font-body)] font-medium"
+            style={{ background: 'var(--color-card)', color: '#06B6D4', border: '1px solid #06B6D440' }}
+          >
+            Bewerken
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="px-plate-3 py-plate-2 rounded-lg text-sm font-[var(--font-body)] font-medium disabled:opacity-40"
+            style={{ background: 'var(--color-status-high)', color: '#fff' }}
+          >
+            {deleting ? 'Bezig...' : 'Verwijderen'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
